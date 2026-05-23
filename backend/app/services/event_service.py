@@ -21,6 +21,12 @@ EVENT_TYPES = {
     "vehicle_detected",
     "camera_snapshot_error",
     "detection_error",
+    "tracked_person_detected",
+    "tracked_vehicle_detected",
+    "person_entered_zone",
+    "vehicle_entered_zone",
+    "suspicious_event_candidate",
+    "zone_activity",
 }
 EVENT_STATUSES = {"new", "acknowledged", "resolved", "ignored"}
 
@@ -169,6 +175,123 @@ def process_detection_result(
     return {"created_events": created_events, "skipped_events": skipped_events}
 
 
+def process_tracking_result(
+    channel: str | int,
+    objects: list[object],
+    snapshot_path: str | Path | None,
+    annotated_snapshot_path: str | Path | None,
+) -> dict[str, list[dict[str, object]]]:
+    created_events: list[dict[str, object]] = []
+    skipped_events: list[dict[str, object]] = []
+
+    for candidate in build_event_candidates_from_tracks(channel, objects):
+        event_type = str(candidate["event_type"])
+        event_key = str(candidate["event_key"])
+        if should_create_event(event_key):
+            event = create_event_from_tracking(
+                channel=channel,
+                event_type=event_type,
+                objects=objects,
+                snapshot_path=snapshot_path,
+                annotated_snapshot_path=annotated_snapshot_path,
+                event_key=event_key,
+            )
+            created_events.append(event_to_dict(event))
+        else:
+            skipped_events.append(
+                {
+                    "event_type": event_type,
+                    "event_key": event_key,
+                    "reason": "cooldown",
+                }
+            )
+
+    return {"created_events": created_events, "skipped_events": skipped_events}
+
+
+def build_event_candidates_from_tracks(
+    channel: str | int,
+    objects: list[object],
+) -> list[dict[str, object]]:
+    active_objects = [obj for obj in objects if getattr(obj, "status", None) == "active"]
+    candidates: list[dict[str, object]] = []
+
+    if any(getattr(obj, "class_name", None) == "person" for obj in active_objects):
+        candidates.append(
+            {
+                "event_type": "tracked_person_detected",
+                "event_key": build_event_key(channel, "tracked_person_detected"),
+            }
+        )
+    if any(getattr(obj, "class_name", None) in VEHICLE_CLASSES for obj in active_objects):
+        candidates.append(
+            {
+                "event_type": "tracked_vehicle_detected",
+                "event_key": build_event_key(channel, "tracked_vehicle_detected"),
+            }
+        )
+
+    zone_activity: set[tuple[str, str]] = set()
+    for obj in active_objects:
+        class_name = getattr(obj, "class_name", "")
+        zone_ids = getattr(obj, "zone_ids", []) or []
+        for zone_id in zone_ids:
+            if class_name == "person":
+                zone_activity.add(("person_entered_zone", str(zone_id)))
+            if class_name in VEHICLE_CLASSES:
+                zone_activity.add(("vehicle_entered_zone", str(zone_id)))
+
+    for event_type, zone_id in sorted(zone_activity):
+        candidates.append(
+            {
+                "event_type": event_type,
+                "event_key": build_event_key(channel, f"{event_type}:{zone_id}"),
+            }
+        )
+    return candidates
+
+
+def create_event_from_tracking(
+    channel: str | int,
+    event_type: str,
+    objects: list[object],
+    snapshot_path: str | Path | None,
+    annotated_snapshot_path: str | Path | None,
+    event_key: str | None = None,
+) -> Event:
+    if event_type not in EVENT_TYPES:
+        raise ValueError(f"Unsupported event type: {event_type}")
+
+    related_objects = _filter_tracks_for_event(event_type, objects)
+    confidence = _max_track_confidence(related_objects)
+    with session_scope() as session:
+        event = Event(
+            event_type=event_type,
+            status="new",
+            channel=str(channel),
+            source="hikvision_live_vision_tracking",
+            title=_tracking_event_title(event_type, related_objects),
+            description=_tracking_event_description(event_type, related_objects),
+            confidence=confidence,
+            snapshot_path=str(snapshot_path) if snapshot_path is not None else None,
+            annotated_snapshot_path=(
+                str(annotated_snapshot_path) if annotated_snapshot_path is not None else None
+            ),
+            detections_json=json.dumps(
+                [_track_to_payload(obj) for obj in related_objects],
+                ensure_ascii=True,
+            ),
+            event_key=event_key or build_event_key(channel, event_type),
+        )
+        session.add(event)
+        session.flush()
+        session.refresh(event)
+
+    telegram_alert = _send_telegram_alert(event)
+    setattr(event, "telegram_alert", telegram_alert)
+    return event
+
+
 def list_events(
     limit: int,
     status: str | None = None,
@@ -249,10 +372,25 @@ def _filter_detections_for_event(
     return detections
 
 
+def _filter_tracks_for_event(event_type: str, objects: list[object]) -> list[object]:
+    active_objects = [obj for obj in objects if getattr(obj, "status", None) == "active"]
+    if event_type in {"tracked_person_detected", "person_entered_zone"}:
+        return [obj for obj in active_objects if getattr(obj, "class_name", None) == "person"]
+    if event_type in {"tracked_vehicle_detected", "vehicle_entered_zone"}:
+        return [obj for obj in active_objects if getattr(obj, "class_name", None) in VEHICLE_CLASSES]
+    return active_objects
+
+
 def _max_confidence(detections: list[DetectionResult]) -> float | None:
     if not detections:
         return None
     return max(float(detection.confidence) for detection in detections)
+
+
+def _max_track_confidence(objects: list[object]) -> float | None:
+    if not objects:
+        return None
+    return max(float(getattr(obj, "confidence", 0.0)) for obj in objects)
 
 
 def _event_title(event_type: str, detections: list[DetectionResult]) -> str:
@@ -273,6 +411,51 @@ def _event_description(event_type: str, detections: list[DetectionResult]) -> st
         return _event_title(event_type, detections)
     classes = ", ".join(sorted({detection.class_name for detection in detections}))
     return f"Detected {len(detections)} object(s): {classes}"
+
+
+def _tracking_event_title(event_type: str, objects: list[object]) -> str:
+    count = len(objects)
+    if event_type == "tracked_person_detected":
+        return f"Tracked person detected ({count})"
+    if event_type == "tracked_vehicle_detected":
+        return f"Tracked vehicle detected ({count})"
+    if event_type == "person_entered_zone":
+        return f"Person entered zone ({count})"
+    if event_type == "vehicle_entered_zone":
+        return f"Vehicle entered zone ({count})"
+    if event_type == "zone_activity":
+        return f"Zone activity ({count})"
+    if event_type == "suspicious_event_candidate":
+        return f"Suspicious event candidate ({count})"
+    return event_type
+
+
+def _tracking_event_description(event_type: str, objects: list[object]) -> str:
+    classes = ", ".join(sorted({str(getattr(obj, "class_name", "unknown")) for obj in objects}))
+    zone_ids = sorted(
+        {
+            str(zone_id)
+            for obj in objects
+            for zone_id in (getattr(obj, "zone_ids", []) or [])
+        }
+    )
+    zone_text = f"; zones: {', '.join(zone_ids)}" if zone_ids else ""
+    return f"Tracked {len(objects)} object(s): {classes}{zone_text}"
+
+
+def _track_to_payload(obj: object) -> dict[str, object]:
+    if hasattr(obj, "to_api_dict"):
+        return obj.to_api_dict()
+    return {
+        "track_id": getattr(obj, "track_id", None),
+        "class_name": getattr(obj, "class_name", None),
+        "confidence": getattr(obj, "confidence", None),
+        "bbox": getattr(obj, "bbox", None),
+        "center": getattr(obj, "center", None),
+        "path": getattr(obj, "path", None),
+        "status": getattr(obj, "status", None),
+        "zone_ids": getattr(obj, "zone_ids", None),
+    }
 
 
 def _as_utc(value: datetime) -> datetime:

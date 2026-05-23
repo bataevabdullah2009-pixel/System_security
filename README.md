@@ -472,6 +472,88 @@ POST http://127.0.0.1:8000/api/events/process/hikvision/101
 POST http://127.0.0.1:8000/api/telegram/callback
 ```
 
+## Phase 5 — Real Live Vision Tracking MVP
+
+Phase 5 moves SmartGuard AI from single snapshot detection to a lazy live vision tracking loop:
+
+```text
+Hikvision ISAPI snapshot -> detection backend -> tracker -> track_id -> path -> zones -> live state
+```
+
+The first MVP does not run an unmanaged infinite daemon. `POST /api/vision/hikvision/{channel}/update` performs one controlled update: it fetches a fresh camera frame, runs the configured detection backend, updates in-memory tracked objects, assigns zone ids, creates safe Event Engine candidates through cooldown, and saves the latest annotated frame.
+
+Tracking is not face recognition. A `track_id` is temporary runtime state for one moving object and does not establish a person's identity. Unknown people are not stored as biometric profiles, no face embeddings are created, and no age detection or height estimation is performed. Face recognition must be a separate consent-based phase.
+
+The system does not accuse anyone of theft or crime. Phase 5 only creates neutral security alerts such as `tracked_person_detected`, `tracked_vehicle_detected`, `person_entered_zone`, and `vehicle_entered_zone` for human review.
+
+New environment values:
+
+```env
+TRACKING_ENABLED=true
+TRACK_TTL_SECONDS=10
+TRACK_MAX_PATH_POINTS=30
+TRACK_IOU_THRESHOLD=0.3
+TRACK_DISTANCE_THRESHOLD=120
+```
+
+Zones are configured locally in:
+
+```text
+storage/config/zones.json
+```
+
+Example:
+
+```json
+{
+  "101": [
+    {
+      "id": "entrance",
+      "name": "Entrance",
+      "polygon": [[10, 10], [300, 10], [300, 300], [10, 300]]
+    }
+  ]
+}
+```
+
+New endpoints:
+
+```text
+GET  /api/vision/hikvision/{channel}/state
+POST /api/vision/hikvision/{channel}/update
+GET  /api/vision/hikvision/{channel}/annotated
+GET  /api/vision/hikvision/{channel}/stream.mjpg
+```
+
+Quick check:
+
+```powershell
+cd c:\System_security\System_security\backend
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Then:
+
+```powershell
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/vision/hikvision/101/update
+Invoke-RestMethod http://127.0.0.1:8000/api/vision/hikvision/101/state
+```
+
+Open the annotated frame:
+
+```text
+http://127.0.0.1:8000/api/vision/hikvision/101/annotated
+```
+
+Run tests:
+
+```powershell
+cd c:\System_security\System_security\backend
+pytest
+```
+
 Manual callback body:
 
 ```json

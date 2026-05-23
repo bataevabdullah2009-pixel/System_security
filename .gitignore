@@ -29,6 +29,7 @@ storage/logs/*
 storage/snapshots/*.jpg
 storage/latest/*.jpg
 storage/detections/*.jpg
+storage/vision/latest/*.jpg
 !storage/events/.gitkeep
 !storage/clips/.gitkeep
 !storage/consents/.gitkeep
@@ -37,6 +38,8 @@ storage/detections/*.jpg
 !storage/snapshots/.gitkeep
 !storage/latest/.gitkeep
 !storage/detections/.gitkeep
+!storage/vision/.gitkeep
+!storage/vision/latest/.gitkeep
 
 # Frontend future phases
 node_modules/

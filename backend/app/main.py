@@ -7,6 +7,7 @@ from app.api.routes_detection import router as detection_router
 from app.api.routes_events import router as events_router
 from app.api.routes_health import router as health_router
 from app.api.routes_telegram import router as telegram_router
+from app.api.routes_vision import router as vision_router
 from app.config import settings
 from app.db.database import init_db
 
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(detection_router)
     app.include_router(events_router)
     app.include_router(telegram_router)
+    app.include_router(vision_router)
     return app
 
 
