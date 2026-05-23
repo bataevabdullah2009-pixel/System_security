@@ -727,3 +727,35 @@ pytest
 cd ..\frontend
 npm run build
 ```
+
+## Phase 5.2.1 — Dashboard Integration Stabilization
+
+Phase 5.2.1 stabilizes the frontend/backend contract for the dashboard. The dashboard now checks `GET /health` independently and uses it as the source for `Backend online/offline`. Vision state, worker status, and events each have separate warning states, so a temporary failure in one API does not hide the live camera or incorrectly mark the backend offline.
+
+The frontend uses:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+If the env value is missing, the dashboard falls back to `http://127.0.0.1:8000`. In development mode it prints the active API base URL to the browser console.
+
+Dashboard warning labels:
+
+- `Vision API unavailable`
+- `Events API unavailable`
+- `Worker status unavailable`
+- `Worker stopped`
+
+The vision state contract remains:
+
+```json
+{
+  "channel": "101",
+  "updated_at": "...",
+  "worker": {},
+  "objects": []
+}
+```
+
+The frontend also tolerates a legacy `tracks` field and normalizes it to `objects`.

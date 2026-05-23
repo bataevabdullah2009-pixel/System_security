@@ -4,6 +4,7 @@ import { EventActionStatus, SecurityEvent } from "../api/client";
 
 interface EventsPanelProps {
   events: SecurityEvent[];
+  statusError: string | null;
   loadingAction: string | null;
   onStatusChange: (eventId: number, status: EventActionStatus) => void;
 }
@@ -17,6 +18,7 @@ const statusLabels: Record<string, string> = {
 
 function EventsPanel({
   events,
+  statusError,
   loadingAction,
   onStatusChange,
 }: EventsPanelProps) {
@@ -31,6 +33,9 @@ function EventsPanel({
       </div>
 
       <div className="event-list">
+        {statusError ? (
+          <div className="inline-warning">{statusError}</div>
+        ) : null}
         {events.length === 0 ? (
           <div className="empty-state">No events</div>
         ) : (

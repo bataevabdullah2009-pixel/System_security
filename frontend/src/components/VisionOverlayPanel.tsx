@@ -4,9 +4,10 @@ import { TrackedObject } from "../api/client";
 
 interface VisionOverlayPanelProps {
   objects: TrackedObject[];
+  statusError: string | null;
 }
 
-function VisionOverlayPanel({ objects }: VisionOverlayPanelProps) {
+function VisionOverlayPanel({ objects, statusError }: VisionOverlayPanelProps) {
   return (
     <section className="panel overlay-panel">
       <div className="panel-heading">
@@ -18,6 +19,9 @@ function VisionOverlayPanel({ objects }: VisionOverlayPanelProps) {
       </div>
 
       <div className="object-list">
+        {statusError ? (
+          <div className="inline-warning">{statusError}</div>
+        ) : null}
         {objects.length === 0 ? (
           <div className="empty-state">No tracked objects</div>
         ) : (

@@ -7,6 +7,7 @@ import {
   VisionState,
   VisionWorkerStatus,
   getEvents,
+  getHealth,
   getVisionState,
   getVisionWorkerStatus,
   startVisionWorker,
@@ -30,21 +31,55 @@ function App() {
   );
   const [events, setEvents] = useState<SecurityEvent[]>([]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-  const [lastError, setLastError] = useState<string | null>(null);
+  const [backendHealthError, setBackendHealthError] = useState<string | null>(
+    null,
+  );
+  const [visionStateError, setVisionStateError] = useState<string | null>(null);
+  const [workerStatusError, setWorkerStatusError] = useState<string | null>(
+    null,
+  );
+  const [eventsError, setEventsError] = useState<string | null>(null);
 
   const refreshDashboard = useCallback(async () => {
-    try {
-      const [stateResult, workerResult, eventsResult] = await Promise.all([
+    const [healthResult, stateResult, workerResult, eventsResult] =
+      await Promise.allSettled([
+        getHealth(),
         getVisionState(CHANNEL),
         getVisionWorkerStatus(CHANNEL),
         getEvents(),
       ]);
-      setVisionState(stateResult);
-      setWorkerStatus(workerResult);
-      setEvents(eventsResult);
-      setLastError(null);
-    } catch (error) {
-      setLastError(error instanceof Error ? error.message : String(error));
+
+    setBackendHealthError(
+      healthResult.status === "fulfilled"
+        ? null
+        : formatDashboardError("Backend unavailable", healthResult.reason),
+    );
+
+    if (stateResult.status === "fulfilled") {
+      setVisionState(stateResult.value);
+      setVisionStateError(null);
+    } else {
+      setVisionStateError(
+        formatDashboardError("Vision API unavailable", stateResult.reason),
+      );
+    }
+
+    if (workerResult.status === "fulfilled") {
+      setWorkerStatus(workerResult.value);
+      setWorkerStatusError(null);
+    } else {
+      setWorkerStatusError(
+        formatDashboardError("Worker status unavailable", workerResult.reason),
+      );
+    }
+
+    if (eventsResult.status === "fulfilled") {
+      setEvents(eventsResult.value);
+      setEventsError(null);
+    } else {
+      setEventsError(
+        formatDashboardError("Events API unavailable", eventsResult.reason),
+      );
     }
   }, []);
 
@@ -59,13 +94,17 @@ function App() {
     try {
       if (action === "start") {
         setWorkerStatus(await startVisionWorker(CHANNEL));
+        setWorkerStatusError(null);
       }
       if (action === "stop") {
         setWorkerStatus(await stopVisionWorker(CHANNEL));
+        setWorkerStatusError(null);
       }
       await refreshDashboard();
     } catch (error) {
-      setLastError(error instanceof Error ? error.message : String(error));
+      setWorkerStatusError(
+        formatDashboardError("Worker control unavailable", error),
+      );
     } finally {
       setLoadingAction(null);
     }
@@ -83,9 +122,9 @@ function App() {
           event.id === updatedEvent.id ? updatedEvent : event,
         ),
       );
-      setLastError(null);
+      setEventsError(null);
     } catch (error) {
-      setLastError(error instanceof Error ? error.message : String(error));
+      setEventsError(formatDashboardError("Events API unavailable", error));
     } finally {
       setLoadingAction(null);
     }
@@ -114,9 +153,14 @@ function App() {
   }, [visionState, workerStatus]);
 
   const activeObjects =
-    visionState?.objects.filter((object) => object.status === "active") ?? [];
+    visionState?.objects.filter((object) => object.status !== "lost") ?? [];
   const newEvents = events.filter((event) => event.status === "new").length;
-  const backendOnline = lastError === null;
+  const backendOnline = backendHealthError === null;
+  const statusWarnings = [
+    visionStateError,
+    eventsError,
+    workerStatusError,
+  ].filter(Boolean);
 
   return (
     <Layout
@@ -136,9 +180,27 @@ function App() {
               <RadioTower size={16} />
               <span>{backendOnline ? "Backend online" : "Backend offline"}</span>
             </div>
+            {visionStateError ? (
+              <div className="status-chip status-chip-warning">
+                <AlertTriangle size={16} />
+                <span>Vision API warning</span>
+              </div>
+            ) : null}
+            {eventsError ? (
+              <div className="status-chip status-chip-warning">
+                <AlertTriangle size={16} />
+                <span>Events API warning</span>
+              </div>
+            ) : null}
             <div className="status-chip">
               <Activity size={16} />
               <span>{activeObjects.length} active objects</span>
+            </div>
+            <div className="status-chip">
+              <RadioTower size={16} />
+              <span>
+                {mergedWorkerStatus.running ? "Worker running" : "Worker stopped"}
+              </span>
             </div>
             <div className="status-chip status-chip-alert">
               <AlertTriangle size={16} />
@@ -157,6 +219,7 @@ function App() {
           />
           <WorkerControlPanel
             status={mergedWorkerStatus}
+            statusError={workerStatusError}
             loadingAction={loadingAction}
             onStart={() => runWorkerAction("start")}
             onStop={() => runWorkerAction("stop")}
@@ -168,21 +231,37 @@ function App() {
       center={
         <>
           <CameraLiveView channel={CHANNEL} workerStatus={mergedWorkerStatus} />
-          <VisionOverlayPanel objects={visionState?.objects ?? []} />
+          <VisionOverlayPanel
+            objects={visionState?.objects ?? []}
+            statusError={visionStateError}
+          />
         </>
       }
       right={
         <EventsPanel
           events={events}
+          statusError={eventsError}
           loadingAction={loadingAction}
           onStatusChange={handleEventStatus}
         />
       }
       footer={
-        lastError ? <div className="error-banner">{lastError}</div> : undefined
+        statusWarnings.length ? (
+          <div className="status-banner">{statusWarnings.join(" · ")}</div>
+        ) : undefined
       }
     />
   );
+}
+
+function formatDashboardError(label: string, error: unknown): string {
+  if (error instanceof TypeError) {
+    return label;
+  }
+  if (error instanceof Error && error.message.includes("Failed to fetch")) {
+    return label;
+  }
+  return label;
 }
 
 export default App;

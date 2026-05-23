@@ -4,6 +4,7 @@ import { VisionWorkerStatus } from "../api/client";
 
 interface WorkerControlPanelProps {
   status: VisionWorkerStatus;
+  statusError: string | null;
   loadingAction: string | null;
   onStart: () => void;
   onStop: () => void;
@@ -12,6 +13,7 @@ interface WorkerControlPanelProps {
 
 function WorkerControlPanel({
   status,
+  statusError,
   loadingAction,
   onStart,
   onStop,
@@ -70,7 +72,7 @@ function WorkerControlPanel({
         </div>
         <div>
           <dt>Last error</dt>
-          <dd>{status.last_error ?? "none"}</dd>
+          <dd>{statusError ?? status.last_error ?? "none"}</dd>
         </div>
       </dl>
     </section>

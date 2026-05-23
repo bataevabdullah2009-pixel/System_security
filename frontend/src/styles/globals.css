@@ -136,6 +136,11 @@ h3 {
   border-color: rgba(255, 185, 92, 0.28);
 }
 
+.status-chip-warning {
+  color: #f9d598;
+  border-color: rgba(255, 185, 92, 0.24);
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(420px, 1fr) minmax(290px, 370px);
@@ -512,6 +517,26 @@ h3 {
   background: rgba(90, 37, 25, 0.72);
   border: 1px solid rgba(255, 158, 112, 0.28);
   overflow-wrap: anywhere;
+}
+
+.status-banner,
+.inline-warning {
+  color: #f8d9a6;
+  background: rgba(83, 58, 21, 0.48);
+  border: 1px solid rgba(255, 185, 92, 0.22);
+  overflow-wrap: anywhere;
+}
+
+.status-banner {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.inline-warning {
+  padding: 10px;
+  border-radius: 7px;
+  font-size: 0.84rem;
 }
 
 @media (max-width: 1180px) {
