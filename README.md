@@ -35,6 +35,8 @@ docs/
   05_TEST_PLAN.md
 scripts/
   test_camera.py
+  diagnose_rtsp.py
+  diagnose_hikvision_snapshot.py
 storage/
   events/
   clips/
@@ -134,6 +136,43 @@ Failed decoding SPS
 - Отключить H.265+.
 - Отключить Smart Codec, Smart Video Coding или аналогичные vendor codec features.
 - После изменения настроек перезапустить поток или камеру.
+
+## Hikvision ISAPI HTTP snapshot
+
+На некоторых Hikvision/HiWatch NVR RTSP-авторизация работает, но поток через VLC/OpenCV/FFmpeg декодируется серыми, зелёными или битыми кадрами даже при H.264. Для MVP можно использовать HTTP snapshot через Hikvision ISAPI.
+
+Путь snapshot:
+
+```text
+/ISAPI/Streaming/channels/101/picture
+```
+
+Проверяемые каналы:
+
+```text
+http://HOST:80/ISAPI/Streaming/channels/101/picture
+http://HOST:80/ISAPI/Streaming/channels/102/picture
+http://HOST:80/ISAPI/Streaming/channels/201/picture
+http://HOST:80/ISAPI/Streaming/channels/202/picture
+```
+
+Настройки `.env`:
+
+```env
+HIKVISION_HOST=192.168.0.102
+HIKVISION_USER=admin
+HIKVISION_PASSWORD=your_password_here
+HIKVISION_HTTP_PORT=80
+```
+
+Запуск:
+
+```powershell
+cd c:\System_security\System_security
+.\backend\.venv\Scripts\python.exe .\scripts\diagnose_hikvision_snapshot.py
+```
+
+Скрипт пробует Digest Auth и Basic Auth, сохраняет только ответы `image/jpeg` в `storage/snapshots/`, а пароль в логах маскирует.
 
 ## Тесты
 
