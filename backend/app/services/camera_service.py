@@ -8,10 +8,15 @@ from app.services import hikvision_snapshot_service
 HIKVISION_CHANNELS = ("101", "102", "201", "202")
 
 
-def get_latest_snapshot(channel: int | str) -> tuple[bytes, Path]:
+def capture_fresh_snapshot(channel: int | str) -> tuple[bytes, Path, Path]:
     image_bytes = hikvision_snapshot_service.fetch_snapshot(channel)
     snapshot_path = hikvision_snapshot_service.save_snapshot_bytes(channel, image_bytes)
     latest_path = hikvision_snapshot_service.save_latest_snapshot(channel, image_bytes)
+    return image_bytes, snapshot_path, latest_path
+
+
+def get_latest_snapshot(channel: int | str) -> tuple[bytes, Path]:
+    image_bytes, snapshot_path, latest_path = capture_fresh_snapshot(channel)
     return image_bytes, latest_path if latest_path.exists() else snapshot_path
 
 

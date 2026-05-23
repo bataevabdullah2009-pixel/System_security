@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.routes_cameras import router as cameras_router
+from app.api.routes_detection import router as detection_router
 from app.api.routes_health import router as health_router
 from app.config import settings
 
@@ -14,6 +15,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(cameras_router)
+    app.include_router(detection_router)
     return app
 
 

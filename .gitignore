@@ -12,6 +12,7 @@ venv/
 *.db
 *.sqlite
 *.sqlite3
+*.pt
 
 # Logs and generated media
 storage/events/*
@@ -21,6 +22,7 @@ storage/face_enrollment/*
 storage/logs/*
 storage/snapshots/*.jpg
 storage/latest/*.jpg
+storage/detections/*.jpg
 !storage/events/.gitkeep
 !storage/clips/.gitkeep
 !storage/consents/.gitkeep
@@ -28,6 +30,7 @@ storage/latest/*.jpg
 !storage/logs/.gitkeep
 !storage/snapshots/.gitkeep
 !storage/latest/.gitkeep
+!storage/detections/.gitkeep
 
 # Frontend future phases
 node_modules/

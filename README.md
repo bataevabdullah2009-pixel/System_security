@@ -233,6 +233,52 @@ http://127.0.0.1:8000/api/cameras/hikvision/101/stream.mjpg
 Invoke-RestMethod http://127.0.0.1:8000/api/cameras/hikvision/diagnose
 ```
 
+## Phase 2 — Object Detection MVP
+
+Фаза 2 добавляет локальное object detection на snapshot-кадрах Hikvision ISAPI. Система ищет только MVP-классы:
+
+- `person`
+- `car`
+- `truck`
+- `motorcycle`
+- `bicycle`
+
+Telegram, face recognition, age detection и height estimation в эту фазу не входят.
+
+Модель по умолчанию:
+
+```env
+DETECTION_MODEL=yolo11n.pt
+DETECTION_CONFIDENCE_THRESHOLD=0.45
+DETECTION_ALLOWED_CLASSES=person,car,truck,motorcycle,bicycle
+DETECTION_IMAGE_SIZE=640
+```
+
+Ultralytics может автоматически скачать `yolo11n.pt` при первом запуске detection endpoint. Если модель или пакет недоступны, API вернёт понятную ошибку, а backend продолжит работать.
+
+Установка и запуск:
+
+```powershell
+cd c:\System_security\System_security\backend
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Проверки:
+
+```text
+http://127.0.0.1:8000/api/detection/hikvision/101
+http://127.0.0.1:8000/api/detection/hikvision/101/annotated
+http://127.0.0.1:8000/api/detection/hikvision/diagnose
+```
+
+Annotated snapshots сохраняются локально:
+
+```text
+storage/detections/
+```
+
 ## Тесты
 
 ```powershell
