@@ -19,11 +19,15 @@ storage/clips/*
 storage/consents/*
 storage/face_enrollment/*
 storage/logs/*
+storage/snapshots/*.jpg
+storage/latest/*.jpg
 !storage/events/.gitkeep
 !storage/clips/.gitkeep
 !storage/consents/.gitkeep
 !storage/face_enrollment/.gitkeep
 !storage/logs/.gitkeep
+!storage/snapshots/.gitkeep
+!storage/latest/.gitkeep
 
 # Frontend future phases
 node_modules/

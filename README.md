@@ -174,6 +174,65 @@ cd c:\System_security\System_security
 
 Скрипт пробует Digest Auth и Basic Auth, сохраняет только ответы `image/jpeg` в `storage/snapshots/`, а пароль в логах маскирует.
 
+## Camera Source Strategy
+
+RTSP у некоторых Hikvision/HiWatch NVR может отдавать битые, серые или зелёные кадры через VLC/OpenCV/FFmpeg даже при включённом H.264. В этом MVP основным стабильным источником кадров выбран Hikvision ISAPI HTTP snapshot.
+
+ISAPI snapshot используется как стабильный источник кадров для будущей AI detection pipeline. Позже можно добавить RTSP через более управляемый FFmpeg/GStreamer pipeline или Hikvision SDK, но это отдельный этап.
+
+Основной путь:
+
+```text
+/ISAPI/Streaming/channels/101/picture
+```
+
+Backend endpoints:
+
+```text
+GET /api/cameras/hikvision/diagnose
+GET /api/cameras/hikvision/{channel}/snapshot
+GET /api/cameras/hikvision/{channel}/latest
+GET /api/cameras/hikvision/{channel}/stream.mjpg
+```
+
+HTML для быстрой проверки snapshot:
+
+```html
+<img src="http://127.0.0.1:8000/api/cameras/hikvision/101/snapshot" />
+```
+
+HTML для быстрой проверки MJPEG:
+
+```html
+<img src="http://127.0.0.1:8000/api/cameras/hikvision/101/stream.mjpg" />
+```
+
+## Manual check
+
+Browser напрямую к NVR:
+
+```text
+http://192.168.0.102/ISAPI/Streaming/channels/101/picture
+```
+
+Backend snapshot:
+
+```text
+http://127.0.0.1:8000/api/cameras/hikvision/101/snapshot
+```
+
+Backend MJPEG:
+
+```text
+http://127.0.0.1:8000/api/cameras/hikvision/101/stream.mjpg
+```
+
+Диагностика всех каналов:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/cameras/hikvision/diagnose
+```
+
 ## Тесты
 
 ```powershell

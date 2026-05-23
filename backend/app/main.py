@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.api.routes_cameras import router as cameras_router
 from app.api.routes_health import router as health_router
 from app.config import settings
 
@@ -12,6 +13,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
     app.include_router(health_router)
+    app.include_router(cameras_router)
     return app
 
 
