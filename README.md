@@ -370,6 +370,27 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+After Phase 3, reinstall minimal backend dependencies so SQLAlchemy is available:
+
+```powershell
+cd c:\System_security\System_security\backend
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+If PowerShell blocks `Activate.ps1`, allow activation only for the current shell process:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+You can also run tests without activating the venv:
+
+```powershell
+cd c:\System_security\System_security\backend
+.\.venv\Scripts\python.exe -m pytest
+```
+
 Mock mode for weak PCs and tests:
 
 ```env
