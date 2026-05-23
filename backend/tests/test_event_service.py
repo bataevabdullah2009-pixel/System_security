@@ -13,6 +13,7 @@ def configure_db(monkeypatch, tmp_path):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("EVENT_ENABLED", "true")
     monkeypatch.setenv("EVENT_COOLDOWN_SECONDS", "60")
+    monkeypatch.setenv("TELEGRAM_ALERTS_ENABLED", "false")
     reset_database_engine_cache()
     init_db()
     return db_path
@@ -128,3 +129,23 @@ def test_update_event_status(monkeypatch, tmp_path) -> None:
     assert updated is not None
     assert updated["status"] == "acknowledged"
     assert updated["acknowledged_at"] is not None
+
+
+def test_event_engine_survives_telegram_failure(monkeypatch, tmp_path) -> None:
+    configure_db(monkeypatch, tmp_path)
+
+    def fail_alert(event):
+        raise RuntimeError("network failed")
+
+    from app.services import telegram_alert_service
+
+    monkeypatch.setattr(telegram_alert_service, "send_event_alert", fail_alert)
+    result = event_service.process_detection_result(
+        channel="101",
+        detections=[make_detection("person")],
+        snapshot_path="snapshot.jpg",
+        annotated_snapshot_path="annotated.jpg",
+    )
+
+    assert result["created_events"][0]["event_type"] == "person_detected"
+    assert result["created_events"][0]["telegram_alert"]["sent"] is False

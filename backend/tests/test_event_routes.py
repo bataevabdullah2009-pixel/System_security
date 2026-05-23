@@ -16,6 +16,7 @@ def configure_db(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
     monkeypatch.setenv("EVENT_ENABLED", "true")
     monkeypatch.setenv("EVENT_COOLDOWN_SECONDS", "60")
+    monkeypatch.setenv("TELEGRAM_ALERTS_ENABLED", "false")
     reset_database_engine_cache()
     init_db()
 

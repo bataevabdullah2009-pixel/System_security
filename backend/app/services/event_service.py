@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -12,6 +13,8 @@ from app.db.database import PROJECT_ROOT, session_scope
 from app.db.models import Event
 from app.services.detection_service import DetectionResult, VEHICLE_CLASSES
 
+
+logger = logging.getLogger(__name__)
 
 EVENT_TYPES = {
     "person_detected",
@@ -127,7 +130,10 @@ def create_event_from_detection(
         session.add(event)
         session.flush()
         session.refresh(event)
-        return event
+
+    telegram_alert = _send_telegram_alert(event)
+    setattr(event, "telegram_alert", telegram_alert)
+    return event
 
 
 def process_detection_result(
@@ -228,6 +234,7 @@ def event_to_dict(event: Event) -> dict[str, object]:
         "updated_at": event.updated_at,
         "acknowledged_at": event.acknowledged_at,
         "resolved_at": event.resolved_at,
+        "telegram_alert": getattr(event, "telegram_alert", None),
     }
 
 
@@ -272,3 +279,13 @@ def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _send_telegram_alert(event: Event) -> dict[str, object]:
+    try:
+        from app.services import telegram_alert_service
+
+        return telegram_alert_service.send_event_alert(event)
+    except Exception as exc:
+        logger.warning("Telegram alert integration failed for event_id=%s error=%s", event.id, exc)
+        return {"sent": False, "reason": f"telegram_error: {exc}"}

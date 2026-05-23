@@ -417,3 +417,65 @@ Status update body:
   "status": "acknowledged"
 }
 ```
+
+## Phase 4 — Telegram Alerts MVP
+
+Telegram Alerts sends outbound notifications when Event Engine creates a new `new` event. The alert includes event id, event type, channel, title, confidence when available, created time, inline status buttons, and the annotated snapshot image when it exists.
+
+This phase does not add face recognition, age detection, height estimation, dashboard, SaaS, or payments.
+
+Create a Telegram bot:
+
+1. Open Telegram and start `@BotFather`.
+2. Run `/newbot`.
+3. Follow BotFather prompts and copy the bot token.
+4. Put the token into `.env` as `TELEGRAM_BOT_TOKEN`.
+
+Find `TELEGRAM_CHAT_ID`:
+
+1. Send any message to your new bot.
+2. Open this URL in a browser, replacing the token:
+
+```text
+https://api.telegram.org/botYOUR_TOKEN/getUpdates
+```
+
+3. Find `chat.id` in the response and put it into `.env` as `TELEGRAM_CHAT_ID`.
+
+Telegram `.env` example:
+
+```env
+TELEGRAM_ALERTS_ENABLED=true
+TELEGRAM_BOT_TOKEN=CHANGE_ME
+TELEGRAM_CHAT_ID=CHANGE_ME
+TELEGRAM_SEND_PHOTOS=true
+TELEGRAM_ALERT_COOLDOWN_SECONDS=5
+```
+
+Do not commit real Telegram tokens or chat ids. `.env` is ignored by Git.
+
+Run backend:
+
+```powershell
+cd c:\System_security\System_security\backend
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Checks:
+
+```text
+GET  http://127.0.0.1:8000/api/telegram/diagnose
+POST http://127.0.0.1:8000/api/telegram/test
+POST http://127.0.0.1:8000/api/events/process/hikvision/101
+POST http://127.0.0.1:8000/api/telegram/callback
+```
+
+Manual callback body:
+
+```json
+{
+  "callback_data": "event:1:acknowledged"
+}
+```
