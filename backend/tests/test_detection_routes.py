@@ -60,6 +60,38 @@ def test_detection_api_route_exists(monkeypatch, tmp_path) -> None:
     assert body["detections"][0]["bbox"] == {"x1": 1, "y1": 2, "x2": 30, "y2": 40}
 
 
+def test_detection_api_route_works_with_mock_backend(monkeypatch, tmp_path) -> None:
+    image_bytes = jpeg_bytes()
+    snapshot_path = tmp_path / "snapshot.jpg"
+    latest_path = tmp_path / "latest.jpg"
+    annotated_path = tmp_path / "annotated.jpg"
+
+    monkeypatch.setenv("DETECTION_ENABLED", "true")
+    monkeypatch.setenv("DETECTION_BACKEND", "mock")
+    monkeypatch.setenv("DETECTION_ALLOWED_CLASSES", "person,car")
+    monkeypatch.setenv("DETECTION_CONFIDENCE_THRESHOLD", "0.45")
+    detection_service.reset_detection_backend_cache()
+    monkeypatch.setattr(
+        camera_service,
+        "capture_fresh_snapshot",
+        lambda channel: (image_bytes, snapshot_path, latest_path),
+    )
+    monkeypatch.setattr(
+        detection_service,
+        "save_annotated_snapshot",
+        lambda channel, image_bytes, detections: annotated_path,
+    )
+
+    client = TestClient(app)
+    response = client.get("/api/detection/hikvision/101")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["detections"][0]["class_name"] == "person"
+    assert body["detections"][1]["class_name"] == "car"
+    detection_service.reset_detection_backend_cache()
+
+
 def test_detection_annotated_route_returns_jpeg(monkeypatch, tmp_path) -> None:
     image_bytes = jpeg_bytes()
     snapshot_path = tmp_path / "snapshot.jpg"

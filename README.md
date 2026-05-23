@@ -289,3 +289,52 @@ pytest
 ## Репозиторий
 
 GitHub: https://github.com/bataevabdullah2009-pixel/System_security.git
+
+## Detection Backend Strategy
+
+Phase 2.5 separates object detection from a single YOLO implementation into backend adapters. The API routes stay the same, but `DETECTION_BACKEND` controls which inference backend is used.
+
+Supported values:
+
+- `ultralytics_yolo`: development backend based on Ultralytics YOLO. It is accurate and convenient, but heavy because it requires Torch. Install it only for AI development.
+- `mock`: test/demo backend without AI dependencies. It returns fixed detections and works on weak PCs.
+- `onnxruntime`: future lightweight CPU backend.
+- `openvino`: future Intel CPU/NPU backend.
+- `ncnn`: future edge/mobile backend.
+- `camera_ai`: future integration with cameras where analytics runs inside the camera.
+- `disabled`: returns no detections.
+
+Minimal backend without YOLO/Torch:
+
+```powershell
+cd c:\System_security\System_security\backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+AI dev mode with YOLO:
+
+```powershell
+cd c:\System_security\System_security\backend
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+pip install -r requirements-ai-dev.txt
+```
+
+Example `.env` for lightweight mock mode:
+
+```env
+DETECTION_ENABLED=true
+DETECTION_BACKEND=mock
+```
+
+Example `.env` for YOLO development:
+
+```env
+DETECTION_ENABLED=true
+DETECTION_BACKEND=ultralytics_yolo
+DETECTION_MODEL=yolo11n.pt
+```
+
+The `yolo11n.pt` model is not committed to Git. In YOLO development mode Ultralytics can download it automatically on first use. Production clients should not need a powerful PC at the first stage: the intended path is model export to ONNX/OpenVINO/NCNN, or using AI cameras / edge boxes that perform inference outside the main backend.

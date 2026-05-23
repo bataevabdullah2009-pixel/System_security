@@ -14,6 +14,12 @@ venv/
 *.sqlite3
 *.pt
 
+# AI model artifacts
+models/*.pt
+models/*.onnx
+models/*_openvino_model/
+models/*_ncnn_model/
+
 # Logs and generated media
 storage/events/*
 storage/clips/*

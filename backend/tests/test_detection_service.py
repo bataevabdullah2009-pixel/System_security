@@ -51,8 +51,9 @@ def test_detection_result_bbox_format() -> None:
 
 
 def test_load_detection_model_missing_ultralytics_is_clear(monkeypatch) -> None:
-    detection_service.load_detection_model.cache_clear()
+    detection_service.reset_detection_backend_cache()
     monkeypatch.setenv("DETECTION_ENABLED", "true")
+    monkeypatch.setenv("DETECTION_BACKEND", "ultralytics_yolo")
     monkeypatch.setitem(sys.modules, "ultralytics", None)
 
     try:
@@ -62,4 +63,34 @@ def test_load_detection_model_missing_ultralytics_is_clear(monkeypatch) -> None:
     else:
         raise AssertionError("Expected DetectionModelError")
     finally:
-        detection_service.load_detection_model.cache_clear()
+        detection_service.reset_detection_backend_cache()
+
+
+def test_mock_backend_returns_detections(monkeypatch) -> None:
+    monkeypatch.setenv("DETECTION_ENABLED", "true")
+    monkeypatch.setenv("DETECTION_BACKEND", "mock")
+    monkeypatch.setenv("DETECTION_ALLOWED_CLASSES", "person,car")
+    monkeypatch.setenv("DETECTION_CONFIDENCE_THRESHOLD", "0.45")
+    detection_service.reset_detection_backend_cache()
+
+    results = detection_service.detect_objects(b"not-used-by-mock", channel="101")
+
+    assert [result.class_name for result in results] == ["person", "car"]
+    assert all(result.channel == "101" for result in results)
+    detection_service.reset_detection_backend_cache()
+
+
+def test_unknown_backend_returns_clear_error(monkeypatch) -> None:
+    monkeypatch.setenv("DETECTION_ENABLED", "true")
+    monkeypatch.setenv("DETECTION_BACKEND", "quantum_detector")
+    detection_service.reset_detection_backend_cache()
+
+    try:
+        detection_service.detect_objects(b"not-used", channel="101")
+    except detection_service.DetectionModelError as exc:
+        assert "Unknown detection backend 'quantum_detector'" in str(exc)
+        assert "Supported backends" in str(exc)
+    else:
+        raise AssertionError("Expected DetectionModelError")
+    finally:
+        detection_service.reset_detection_backend_cache()

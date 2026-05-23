@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import asdict, dataclass
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -10,41 +9,50 @@ import cv2
 import numpy as np
 from dotenv import load_dotenv
 
+from app.services.detection_backends.base import (
+    BoundingBox,
+    DetectionBackend,
+    DetectionModelError,
+    DetectionResult,
+)
+from app.services.detection_backends.camera_ai_backend import CameraAiBackend
+from app.services.detection_backends.mock_backend import MockDetectionBackend
+from app.services.detection_backends.ncnn_backend import NcnnBackend
+from app.services.detection_backends.onnxruntime_backend import OnnxRuntimeBackend
+from app.services.detection_backends.openvino_backend import OpenVinoBackend
+from app.services.detection_backends.ultralytics_backend import UltralyticsYoloBackend
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 STORAGE_ROOT = PROJECT_ROOT / "storage"
 DETECTIONS_DIR = STORAGE_ROOT / "detections"
 
 DEFAULT_ALLOWED_CLASSES = ("person", "car", "truck", "motorcycle", "bicycle")
+SUPPORTED_BACKENDS = {
+    "ultralytics_yolo",
+    "onnxruntime",
+    "openvino",
+    "ncnn",
+    "camera_ai",
+    "disabled",
+    "mock",
+}
 VEHICLE_CLASSES = {"car", "truck", "motorcycle", "bicycle"}
 
 
-class DetectionModelError(RuntimeError):
-    pass
+class DisabledDetectionBackend:
+    name = "disabled"
 
+    def load(self) -> None:
+        return None
 
-@dataclass(frozen=True)
-class BoundingBox:
-    x1: int
-    y1: int
-    x2: int
-    y2: int
-
-
-@dataclass(frozen=True)
-class DetectionResult:
-    class_name: str
-    confidence: float
-    bbox: BoundingBox
-    channel: str
-    timestamp: str
-    snapshot_path: str | None = None
-    annotated_snapshot_path: str | None = None
-
-    def to_api_dict(self) -> dict[str, object]:
-        data = asdict(self)
-        data["confidence"] = round(float(self.confidence), 4)
-        return data
+    def detect(
+        self,
+        image_bytes: bytes,
+        channel: str,
+        snapshot_path: str | None = None,
+    ) -> list[DetectionResult]:
+        return []
 
 
 def _load_env() -> None:
@@ -54,6 +62,11 @@ def _load_env() -> None:
 def detection_enabled() -> bool:
     _load_env()
     return os.getenv("DETECTION_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def detection_backend_name() -> str:
+    _load_env()
+    return os.getenv("DETECTION_BACKEND", "ultralytics_yolo").strip().lower() or "ultralytics_yolo"
 
 
 def detection_model_name() -> str:
@@ -87,22 +100,47 @@ def allowed_classes() -> set[str]:
 
 
 @lru_cache(maxsize=1)
-def load_detection_model():
+def get_detection_backend() -> DetectionBackend:
     if not detection_enabled():
-        raise DetectionModelError("Object detection is disabled by DETECTION_ENABLED=false")
+        return DisabledDetectionBackend()
 
-    try:
-        from ultralytics import YOLO
-    except ImportError as exc:
-        raise DetectionModelError(
-            "Ultralytics YOLO is not installed. Run: pip install -r backend/requirements.txt"
-        ) from exc
+    backend_name = detection_backend_name()
+    if backend_name == "ultralytics_yolo":
+        return UltralyticsYoloBackend(
+            model_name=detection_model_name,
+            confidence_threshold=confidence_threshold,
+            image_size=image_size,
+            filter_detections=filter_detections,
+        )
+    if backend_name == "mock":
+        return MockDetectionBackend(filter_detections=filter_detections)
+    if backend_name == "onnxruntime":
+        return OnnxRuntimeBackend()
+    if backend_name == "openvino":
+        return OpenVinoBackend()
+    if backend_name == "ncnn":
+        return NcnnBackend()
+    if backend_name == "camera_ai":
+        return CameraAiBackend()
+    if backend_name == "disabled":
+        return DisabledDetectionBackend()
 
-    model_name = detection_model_name()
-    try:
-        return YOLO(model_name)
-    except Exception as exc:
-        raise DetectionModelError(f"Could not load detection model {model_name!r}: {exc}") from exc
+    allowed = ", ".join(sorted(SUPPORTED_BACKENDS))
+    raise DetectionModelError(
+        f"Unknown detection backend {backend_name!r}. Supported backends: {allowed}"
+    )
+
+
+@lru_cache(maxsize=1)
+def load_detection_model():
+    backend = get_detection_backend()
+    backend.load()
+    return backend
+
+
+def reset_detection_backend_cache() -> None:
+    get_detection_backend.cache_clear()
+    load_detection_model.cache_clear()
 
 
 def _decode_image(image_bytes: bytes):
@@ -113,56 +151,13 @@ def _decode_image(image_bytes: bytes):
     return image
 
 
-def _result_class_name(model, class_id: int) -> str:
-    names = getattr(model, "names", {}) or {}
-    if isinstance(names, dict):
-        return str(names.get(class_id, class_id))
-    if isinstance(names, list) and 0 <= class_id < len(names):
-        return str(names[class_id])
-    return str(class_id)
-
-
 def detect_objects(
     image_bytes: bytes,
     channel: int | str,
     snapshot_path: str | None = None,
 ) -> list[DetectionResult]:
-    image = _decode_image(image_bytes)
-    model = load_detection_model()
-    timestamp = datetime.now().isoformat(timespec="seconds")
-
-    try:
-        raw_results = model.predict(
-            source=image,
-            imgsz=image_size(),
-            conf=confidence_threshold(),
-            verbose=False,
-        )
-    except Exception as exc:
-        raise DetectionModelError(f"Object detection inference failed: {exc}") from exc
-
-    detections: list[DetectionResult] = []
-    for result in raw_results:
-        boxes = getattr(result, "boxes", None)
-        if boxes is None:
-            continue
-
-        for box in boxes:
-            class_id = int(box.cls[0].item())
-            confidence = float(box.conf[0].item())
-            x1, y1, x2, y2 = [int(round(value)) for value in box.xyxy[0].tolist()]
-            detections.append(
-                DetectionResult(
-                    class_name=_result_class_name(model, class_id),
-                    confidence=confidence,
-                    bbox=BoundingBox(x1=x1, y1=y1, x2=x2, y2=y2),
-                    channel=str(channel),
-                    timestamp=timestamp,
-                    snapshot_path=snapshot_path,
-                )
-            )
-
-    return filter_detections(detections)
+    backend = get_detection_backend()
+    return backend.detect(image_bytes=image_bytes, channel=str(channel), snapshot_path=snapshot_path)
 
 
 def filter_detections(results: list[DetectionResult]) -> list[DetectionResult]:
