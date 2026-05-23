@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Local env and databases
+.env
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs and generated media
+storage/events/*
+storage/clips/*
+storage/consents/*
+storage/face_enrollment/*
+storage/logs/*
+!storage/events/.gitkeep
+!storage/clips/.gitkeep
+!storage/consents/.gitkeep
+!storage/face_enrollment/.gitkeep
+!storage/logs/.gitkeep
+
+# Frontend future phases
+node_modules/
+dist/
+.vite/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
