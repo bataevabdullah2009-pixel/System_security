@@ -668,3 +668,62 @@ Production webhook setup should use a real public domain with HTTPS. Manual loca
 ```text
 POST http://127.0.0.1:8000/api/telegram/callback
 ```
+
+## Phase 5.2 — Premium Web Dashboard MVP
+
+Phase 5.2 adds a local premium web dashboard for SmartGuard AI. The dashboard is a Vite + React + TypeScript frontend that talks to the existing FastAPI backend and shows live vision state without adding face recognition, age detection, height estimation, biometric identity storage, or crime accusations.
+
+Dashboard view:
+
+- Live Hikvision channel 101 MJPEG stream with annotated-frame fallback.
+- Worker start, stop, and refresh controls.
+- Camera status, worker status, update count, last update, and last error.
+- Active tracked objects with track id, class, confidence, zones, dwell seconds, and active/lost status.
+- Event queue from `GET /api/events` with actions for `acknowledged`, `ignored`, and `resolved`.
+- Observed zone activity from current tracking state.
+
+Backend:
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Check:
+
+```text
+open http://127.0.0.1:5173
+```
+
+Frontend environment:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Local FastAPI CORS allows only the Vite development origins:
+
+```text
+http://127.0.0.1:5173
+http://localhost:5173
+```
+
+Quality checks:
+
+```powershell
+cd backend
+pytest
+
+cd ..\frontend
+npm run build
+```
