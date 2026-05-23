@@ -46,6 +46,7 @@ Expected JSON:
 
 ## Later Phase Test Areas
 
+- RTSP diagnostics with `scripts/test_camera.py`.
 - Camera connection status.
 - RTSP reconnect.
 - Test video mode.

@@ -27,6 +27,7 @@ Goal: connect a test video source or RTSP camera.
 
 Deliverables:
 
+- RTSP diagnostic script reading `RTSP_URL` from `.env`.
 - Camera model.
 - Camera API.
 - RTSP or `video.mp4` source.
