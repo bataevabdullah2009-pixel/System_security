@@ -13,7 +13,6 @@ from app.db.database import PROJECT_ROOT, session_scope
 from app.db.models import Event
 from app.services.detection_service import DetectionResult, VEHICLE_CLASSES
 
-
 logger = logging.getLogger(__name__)
 
 EVENT_TYPES = {
@@ -25,6 +24,9 @@ EVENT_TYPES = {
     "tracked_vehicle_detected",
     "person_entered_zone",
     "vehicle_entered_zone",
+    "person_entered_restricted_zone",
+    "person_loitering",
+    "vehicle_stopped_in_zone",
     "suspicious_event_candidate",
     "zone_activity",
 }
@@ -37,7 +39,12 @@ def _load_env() -> None:
 
 def event_enabled() -> bool:
     _load_env()
-    return os.getenv("EVENT_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv("EVENT_ENABLED", "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def event_cooldown_seconds() -> float:
@@ -58,7 +65,9 @@ def build_event_candidates_from_detections(
     detections: list[DetectionResult],
 ) -> list[dict[str, object]]:
     candidates: list[dict[str, object]] = []
-    person_detections = [detection for detection in detections if detection.class_name == "person"]
+    person_detections = [
+        detection for detection in detections if detection.class_name == "person"
+    ]
     vehicle_detections = [
         detection for detection in detections if detection.class_name in VEHICLE_CLASSES
     ]
@@ -125,7 +134,9 @@ def create_event_from_detection(
             confidence=confidence,
             snapshot_path=str(snapshot_path) if snapshot_path is not None else None,
             annotated_snapshot_path=(
-                str(annotated_snapshot_path) if annotated_snapshot_path is not None else None
+                str(annotated_snapshot_path)
+                if annotated_snapshot_path is not None
+                else None
             ),
             detections_json=json.dumps(
                 [detection.to_api_dict() for detection in related_detections],
@@ -180,11 +191,12 @@ def process_tracking_result(
     objects: list[object],
     snapshot_path: str | Path | None,
     annotated_snapshot_path: str | Path | None,
+    zones: list[dict[str, object]] | None = None,
 ) -> dict[str, list[dict[str, object]]]:
     created_events: list[dict[str, object]] = []
     skipped_events: list[dict[str, object]] = []
 
-    for candidate in build_event_candidates_from_tracks(channel, objects):
+    for candidate in build_event_candidates_from_tracks(channel, objects, zones=zones):
         event_type = str(candidate["event_type"])
         event_key = str(candidate["event_key"])
         if should_create_event(event_key):
@@ -212,9 +224,17 @@ def process_tracking_result(
 def build_event_candidates_from_tracks(
     channel: str | int,
     objects: list[object],
+    zones: list[dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
-    active_objects = [obj for obj in objects if getattr(obj, "status", None) == "active"]
+    active_objects = [
+        obj for obj in objects if getattr(obj, "status", None) == "active"
+    ]
     candidates: list[dict[str, object]] = []
+    zones_by_id = {
+        str(zone["id"]): zone
+        for zone in (zones or [])
+        if isinstance(zone, dict) and isinstance(zone.get("id"), str)
+    }
 
     if any(getattr(obj, "class_name", None) == "person" for obj in active_objects):
         candidates.append(
@@ -223,7 +243,9 @@ def build_event_candidates_from_tracks(
                 "event_key": build_event_key(channel, "tracked_person_detected"),
             }
         )
-    if any(getattr(obj, "class_name", None) in VEHICLE_CLASSES for obj in active_objects):
+    if any(
+        getattr(obj, "class_name", None) in VEHICLE_CLASSES for obj in active_objects
+    ):
         candidates.append(
             {
                 "event_type": "tracked_vehicle_detected",
@@ -234,12 +256,37 @@ def build_event_candidates_from_tracks(
     zone_activity: set[tuple[str, str]] = set()
     for obj in active_objects:
         class_name = getattr(obj, "class_name", "")
+        track_id = getattr(obj, "track_id", "unknown")
+        dwell = getattr(obj, "dwell", {}) or {}
         zone_ids = getattr(obj, "zone_ids", []) or []
         for zone_id in zone_ids:
+            zone_type = str(zones_by_id.get(str(zone_id), {}).get("type") or "")
             if class_name == "person":
                 zone_activity.add(("person_entered_zone", str(zone_id)))
+                if zone_type == "restricted":
+                    zone_activity.add(("person_entered_restricted_zone", str(zone_id)))
+                if float(dwell.get(zone_id, 0.0)) >= _loitering_threshold_seconds():
+                    candidates.append(
+                        {
+                            "event_type": "person_loitering",
+                            "event_key": build_event_key(
+                                channel,
+                                f"person_loitering:{track_id}:{zone_id}",
+                            ),
+                        }
+                    )
             if class_name in VEHICLE_CLASSES:
                 zone_activity.add(("vehicle_entered_zone", str(zone_id)))
+                if float(dwell.get(zone_id, 0.0)) >= _loitering_threshold_seconds():
+                    candidates.append(
+                        {
+                            "event_type": "vehicle_stopped_in_zone",
+                            "event_key": build_event_key(
+                                channel,
+                                f"vehicle_stopped_in_zone:{track_id}:{zone_id}",
+                            ),
+                        }
+                    )
 
     for event_type, zone_id in sorted(zone_activity):
         candidates.append(
@@ -275,7 +322,9 @@ def create_event_from_tracking(
             confidence=confidence,
             snapshot_path=str(snapshot_path) if snapshot_path is not None else None,
             annotated_snapshot_path=(
-                str(annotated_snapshot_path) if annotated_snapshot_path is not None else None
+                str(annotated_snapshot_path)
+                if annotated_snapshot_path is not None
+                else None
             ),
             detections_json=json.dumps(
                 [_track_to_payload(obj) for obj in related_objects],
@@ -366,18 +415,43 @@ def _filter_detections_for_event(
     detections: list[DetectionResult],
 ) -> list[DetectionResult]:
     if event_type == "person_detected":
-        return [detection for detection in detections if detection.class_name == "person"]
+        return [
+            detection for detection in detections if detection.class_name == "person"
+        ]
     if event_type == "vehicle_detected":
-        return [detection for detection in detections if detection.class_name in VEHICLE_CLASSES]
+        return [
+            detection
+            for detection in detections
+            if detection.class_name in VEHICLE_CLASSES
+        ]
     return detections
 
 
 def _filter_tracks_for_event(event_type: str, objects: list[object]) -> list[object]:
-    active_objects = [obj for obj in objects if getattr(obj, "status", None) == "active"]
-    if event_type in {"tracked_person_detected", "person_entered_zone"}:
-        return [obj for obj in active_objects if getattr(obj, "class_name", None) == "person"]
-    if event_type in {"tracked_vehicle_detected", "vehicle_entered_zone"}:
-        return [obj for obj in active_objects if getattr(obj, "class_name", None) in VEHICLE_CLASSES]
+    active_objects = [
+        obj for obj in objects if getattr(obj, "status", None) == "active"
+    ]
+    if event_type in {
+        "tracked_person_detected",
+        "person_entered_zone",
+        "person_entered_restricted_zone",
+        "person_loitering",
+    }:
+        return [
+            obj
+            for obj in active_objects
+            if getattr(obj, "class_name", None) == "person"
+        ]
+    if event_type in {
+        "tracked_vehicle_detected",
+        "vehicle_entered_zone",
+        "vehicle_stopped_in_zone",
+    }:
+        return [
+            obj
+            for obj in active_objects
+            if getattr(obj, "class_name", None) in VEHICLE_CLASSES
+        ]
     return active_objects
 
 
@@ -423,6 +497,12 @@ def _tracking_event_title(event_type: str, objects: list[object]) -> str:
         return f"Person entered zone ({count})"
     if event_type == "vehicle_entered_zone":
         return f"Vehicle entered zone ({count})"
+    if event_type == "person_entered_restricted_zone":
+        return f"Person entered restricted zone ({count})"
+    if event_type == "person_loitering":
+        return "Person loitering in zone"
+    if event_type == "vehicle_stopped_in_zone":
+        return "Vehicle stopped in zone"
     if event_type == "zone_activity":
         return f"Zone activity ({count})"
     if event_type == "suspicious_event_candidate":
@@ -431,7 +511,9 @@ def _tracking_event_title(event_type: str, objects: list[object]) -> str:
 
 
 def _tracking_event_description(event_type: str, objects: list[object]) -> str:
-    classes = ", ".join(sorted({str(getattr(obj, "class_name", "unknown")) for obj in objects}))
+    classes = ", ".join(
+        sorted({str(getattr(obj, "class_name", "unknown")) for obj in objects})
+    )
     zone_ids = sorted(
         {
             str(zone_id)
@@ -455,7 +537,17 @@ def _track_to_payload(obj: object) -> dict[str, object]:
         "path": getattr(obj, "path", None),
         "status": getattr(obj, "status", None),
         "zone_ids": getattr(obj, "zone_ids", None),
+        "dwell": getattr(obj, "dwell", None),
     }
+
+
+def _loitering_threshold_seconds() -> float:
+    try:
+        from app.services import dwell_service
+
+        return dwell_service.loitering_threshold_seconds()
+    except Exception:
+        return 30.0
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -470,5 +562,7 @@ def _send_telegram_alert(event: Event) -> dict[str, object]:
 
         return telegram_alert_service.send_event_alert(event)
     except Exception as exc:
-        logger.warning("Telegram alert integration failed for event_id=%s error=%s", event.id, exc)
+        logger.warning(
+            "Telegram alert integration failed for event_id=%s error=%s", event.id, exc
+        )
         return {"sent": False, "reason": f"telegram_error: {exc}"}

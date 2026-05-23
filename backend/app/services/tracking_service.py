@@ -24,6 +24,7 @@ class TrackedObject:
     last_seen_at: datetime
     status: str = "active"
     zone_ids: list[str] = field(default_factory=list)
+    dwell: dict[str, float] = field(default_factory=dict)
 
     def to_api_dict(self) -> dict[str, object]:
         return {
@@ -38,6 +39,9 @@ class TrackedObject:
             "last_seen_at": self.last_seen_at.isoformat(),
             "status": self.status,
             "zone_ids": self.zone_ids,
+            "dwell": {
+                zone_id: round(seconds, 2) for zone_id, seconds in self.dwell.items()
+            },
         }
 
 
@@ -51,7 +55,12 @@ def _load_env() -> None:
 
 def tracking_enabled() -> bool:
     _load_env()
-    return os.getenv("TRACKING_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv("TRACKING_ENABLED", "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def track_ttl_seconds() -> float:
@@ -95,7 +104,9 @@ def update_tracks(
     for detection in detections:
         bbox = _bbox_to_list(detection)
         center = _bbox_center(bbox)
-        match = _find_best_match(tracks, detection.class_name, bbox, center, matched_track_ids)
+        match = _find_best_match(
+            tracks, detection.class_name, bbox, center, matched_track_ids
+        )
 
         if match is None:
             tracks.append(_new_track(channel_key, detection, bbox, center, now))
@@ -106,7 +117,7 @@ def update_tracks(
         match.bbox = bbox
         match.center = center
         match.path.append(center)
-        match.path = match.path[-track_max_path_points():]
+        match.path = match.path[-track_max_path_points() :]
         match.last_seen_at = now
         match.status = "active"
         matched_track_ids.add(match.track_id)
@@ -122,7 +133,9 @@ def get_tracks(channel: int | str, now: datetime | None = None) -> list[TrackedO
     return list(tracks)
 
 
-def set_track_zones(channel: int | str, zones_by_track_id: dict[int, list[str]]) -> None:
+def set_track_zones(
+    channel: int | str, zones_by_track_id: dict[int, list[str]]
+) -> None:
     for track in _TRACKS_BY_CHANNEL.get(str(channel), []):
         if track.track_id in zones_by_track_id:
             track.zone_ids = zones_by_track_id[track.track_id]
@@ -186,7 +199,10 @@ def _find_best_match(
 def _mark_lost_tracks(tracks: list[TrackedObject], now: datetime) -> None:
     ttl = track_ttl_seconds()
     for track in tracks:
-        if track.status == "active" and (now - track.last_seen_at).total_seconds() > ttl:
+        if (
+            track.status == "active"
+            and (now - track.last_seen_at).total_seconds() > ttl
+        ):
             track.status = "lost"
 
 

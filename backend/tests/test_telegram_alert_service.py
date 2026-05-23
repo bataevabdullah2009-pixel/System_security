@@ -63,7 +63,9 @@ def test_callback_data_updates_event_status(monkeypatch, tmp_path) -> None:
         annotated_snapshot_path="annotated.jpg",
     )
 
-    result = telegram_alert_service.handle_callback_update(f"event:{event.id}:acknowledged")
+    result = telegram_alert_service.handle_callback_update(
+        f"event:{event.id}:acknowledged"
+    )
 
     assert result["ok"] is True
     assert result["event"]["status"] == "acknowledged"

@@ -6,7 +6,9 @@ from app.services import tracking_service
 from app.services.detection_service import BoundingBox, DetectionResult
 
 
-def detection(x1: int, y1: int, x2: int, y2: int, class_name: str = "person") -> DetectionResult:
+def detection(
+    x1: int, y1: int, x2: int, y2: int, class_name: str = "person"
+) -> DetectionResult:
     return DetectionResult(
         class_name=class_name,
         confidence=0.91,
@@ -35,7 +37,9 @@ def test_similar_bbox_updates_same_track_id(monkeypatch) -> None:
     monkeypatch.setenv("TRACKING_ENABLED", "true")
     now = datetime.now(timezone.utc)
 
-    first = tracking_service.update_tracks("101", [detection(10, 10, 50, 80)], now=now)[0]
+    first = tracking_service.update_tracks("101", [detection(10, 10, 50, 80)], now=now)[
+        0
+    ]
     first_track_id = first.track_id
     first_center = list(first.center)
     second = tracking_service.update_tracks(

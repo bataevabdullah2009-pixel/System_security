@@ -3,12 +3,20 @@
     {
       "id": "entrance",
       "name": "Entrance",
+      "type": "entry",
       "polygon": [[10, 10], [300, 10], [300, 300], [10, 300]]
     },
     {
       "id": "cashier",
       "name": "Cashier",
+      "type": "cashier",
       "polygon": [[400, 100], [700, 100], [700, 400], [400, 400]]
+    },
+    {
+      "id": "restricted",
+      "name": "Restricted zone",
+      "type": "restricted",
+      "polygon": [[800, 100], [1100, 100], [1100, 500], [800, 500]]
     }
   ]
 }

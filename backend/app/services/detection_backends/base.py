@@ -35,13 +35,11 @@ class DetectionResult:
 class DetectionBackend(Protocol):
     name: str
 
-    def load(self) -> None:
-        ...
+    def load(self) -> None: ...
 
     def detect(
         self,
         image_bytes: bytes,
         channel: str,
         snapshot_path: str | None = None,
-    ) -> list[DetectionResult]:
-        ...
+    ) -> list[DetectionResult]: ...

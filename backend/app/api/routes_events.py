@@ -5,25 +5,30 @@ from fastapi import APIRouter, HTTPException
 from app.db.schemas import EventStatusUpdate
 from app.services import camera_service, detection_service, event_service
 
-
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 
 def _validate_channel(channel: str) -> str:
     if channel not in camera_service.HIKVISION_CHANNELS:
         allowed = ", ".join(camera_service.HIKVISION_CHANNELS)
-        raise HTTPException(status_code=400, detail=f"Unsupported channel. Use one of: {allowed}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported channel. Use one of: {allowed}"
+        )
     return channel
 
 
 def _process_hikvision_channel(channel: str) -> dict[str, object]:
-    image_bytes, snapshot_path, _latest_path = camera_service.capture_fresh_snapshot(channel)
+    image_bytes, snapshot_path, _latest_path = camera_service.capture_fresh_snapshot(
+        channel
+    )
     detections = detection_service.detect_objects(
         image_bytes=image_bytes,
         channel=channel,
         snapshot_path=str(snapshot_path),
     )
-    annotated_path = detection_service.save_annotated_snapshot(channel, image_bytes, detections)
+    annotated_path = detection_service.save_annotated_snapshot(
+        channel, image_bytes, detections
+    )
     result = event_service.process_detection_result(
         channel=channel,
         detections=detections,

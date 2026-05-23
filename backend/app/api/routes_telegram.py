@@ -5,7 +5,6 @@ from fastapi import APIRouter, HTTPException
 
 from app.services import telegram_alert_service
 
-
 router = APIRouter(prefix="/api/telegram", tags=["telegram"])
 
 

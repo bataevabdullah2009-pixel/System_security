@@ -18,7 +18,9 @@ def configure_db(monkeypatch, tmp_path) -> None:
 
 def test_webhook_ignores_update_without_callback() -> None:
     client = TestClient(app)
-    response = client.post("/api/telegram/webhook", json={"update_id": 1, "message": {"text": "hi"}})
+    response = client.post(
+        "/api/telegram/webhook", json={"update_id": 1, "message": {"text": "hi"}}
+    )
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "ignored": True}

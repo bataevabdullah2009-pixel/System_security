@@ -7,8 +7,12 @@ from collections.abc import Generator
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 
-from app.services import camera_service, detection_service, vision_loop_service
-
+from app.services import (
+    camera_service,
+    detection_service,
+    vision_loop_service,
+    vision_worker_service,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/vision", tags=["vision"])
@@ -17,7 +21,9 @@ router = APIRouter(prefix="/api/vision", tags=["vision"])
 def _validate_channel(channel: str) -> str:
     if channel not in camera_service.HIKVISION_CHANNELS:
         allowed = ", ".join(camera_service.HIKVISION_CHANNELS)
-        raise HTTPException(status_code=400, detail=f"Unsupported channel. Use one of: {allowed}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported channel. Use one of: {allowed}"
+        )
     return channel
 
 
@@ -38,6 +44,24 @@ def update_hikvision_vision_state(channel: str) -> dict[str, object]:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+@router.post("/hikvision/{channel}/worker/start")
+def start_hikvision_vision_worker(channel: str) -> dict[str, object]:
+    _validate_channel(channel)
+    return vision_worker_service.start_worker(channel)
+
+
+@router.post("/hikvision/{channel}/worker/stop")
+def stop_hikvision_vision_worker(channel: str) -> dict[str, object]:
+    _validate_channel(channel)
+    return vision_worker_service.stop_worker(channel)
+
+
+@router.get("/hikvision/{channel}/worker/status")
+def get_hikvision_vision_worker_status(channel: str) -> dict[str, object]:
+    _validate_channel(channel)
+    return vision_worker_service.get_worker_status(channel)
+
+
 @router.get("/hikvision/{channel}/annotated")
 def get_hikvision_vision_annotated(channel: str) -> Response:
     _validate_channel(channel)
@@ -51,7 +75,9 @@ def get_hikvision_vision_annotated(channel: str) -> Response:
         except Exception as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
     if image_bytes is None:
-        raise HTTPException(status_code=404, detail="No annotated vision frame saved yet")
+        raise HTTPException(
+            status_code=404, detail="No annotated vision frame saved yet"
+        )
     return Response(content=image_bytes, media_type="image/jpeg")
 
 
@@ -70,7 +96,9 @@ def _mjpeg_generator(channel: str) -> Generator[bytes, None, None]:
                     + b"\r\n"
                 )
         except Exception as exc:
-            logger.warning("Vision MJPEG update failed for channel %s: %s", channel, exc)
+            logger.warning(
+                "Vision MJPEG update failed for channel %s: %s", channel, exc
+            )
         time.sleep(1)
 
 

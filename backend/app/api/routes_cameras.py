@@ -9,7 +9,6 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from app.services import camera_service
 
-
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/cameras", tags=["cameras"])
 
@@ -17,7 +16,9 @@ router = APIRouter(prefix="/api/cameras", tags=["cameras"])
 def _validate_channel(channel: str) -> str:
     if channel not in camera_service.HIKVISION_CHANNELS:
         allowed = ", ".join(camera_service.HIKVISION_CHANNELS)
-        raise HTTPException(status_code=400, detail=f"Unsupported channel. Use one of: {allowed}")
+        raise HTTPException(
+            status_code=400, detail=f"Unsupported channel. Use one of: {allowed}"
+        )
     return channel
 
 
@@ -59,7 +60,9 @@ def _mjpeg_generator(channel: str) -> Generator[bytes, None, None]:
                 + b"\r\n"
             )
         except Exception as exc:
-            logger.warning("MJPEG snapshot fetch failed for channel %s: %s", channel, exc)
+            logger.warning(
+                "MJPEG snapshot fetch failed for channel %s: %s", channel, exc
+            )
             time.sleep(1)
             continue
 

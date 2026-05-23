@@ -60,7 +60,9 @@ def test_hikvision_diagnose_api_route_exists(monkeypatch) -> None:
             }
         ]
 
-    monkeypatch.setattr(camera_service, "diagnose_all_channels", fake_diagnose_all_channels)
+    monkeypatch.setattr(
+        camera_service, "diagnose_all_channels", fake_diagnose_all_channels
+    )
 
     client = TestClient(app)
     response = client.get("/api/cameras/hikvision/diagnose")

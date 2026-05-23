@@ -554,6 +554,97 @@ cd c:\System_security\System_security\backend
 pytest
 ```
 
+## Phase 5.1 — Premium Live Vision Core
+
+Phase 5.1 upgrades the live vision core from endpoint-only lazy updates to a controlled premium-style surveillance loop. The lazy endpoint still exists, but a managed worker can now run repeated updates with a stop flag, interval, status, update count, and last camera/detection error.
+
+The worker is off by default and starts only through API:
+
+```env
+VISION_WORKER_ENABLED=false
+VISION_WORKER_INTERVAL_SECONDS=1.0
+VISION_WORKER_CHANNELS=101
+DWELL_ENABLED=true
+LOITERING_THRESHOLD_SECONDS=30
+```
+
+Worker endpoints:
+
+```text
+POST /api/vision/hikvision/{channel}/worker/start
+POST /api/vision/hikvision/{channel}/worker/stop
+GET  /api/vision/hikvision/{channel}/worker/status
+```
+
+Example:
+
+```powershell
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/vision/hikvision/101/worker/start
+Invoke-RestMethod http://127.0.0.1:8000/api/vision/hikvision/101/worker/status
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/vision/hikvision/101/worker/stop
+```
+
+Live state now includes worker summary and dwell time:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/vision/hikvision/101/state
+```
+
+The response includes:
+
+```json
+{
+  "channel": "101",
+  "updated_at": "...",
+  "worker": {
+    "running": true,
+    "updates_count": 120,
+    "last_error": null
+  },
+  "objects": [
+    {
+      "track_id": 1,
+      "class_name": "person",
+      "status": "active",
+      "zone_ids": ["cashier"],
+      "dwell": {
+        "cashier": 42.5
+      }
+    }
+  ]
+}
+```
+
+Live tracking state is also persisted locally in SQLite tables:
+
+```text
+vision_tracks
+vision_track_points
+vision_zone_presence
+```
+
+These tables store temporary object tracks, path points, zone presence, and dwell seconds. They do not store face embeddings, identity, or biometric profiles.
+
+Zone rules are configured in `storage/config/zones.json`. Supported MVP zone fields include `id`, `name`, `type`, and `polygon`. If a person enters a zone with `type: "restricted"`, the Event Engine can create `person_entered_restricted_zone`. If a person remains in one zone longer than `LOITERING_THRESHOLD_SECONDS`, the Event Engine can create `person_loitering`. Vehicles can create `vehicle_stopped_in_zone` after the same dwell threshold.
+
+All these events are security incident candidates for human review. The system does not identify a person, does not perform face recognition, does not estimate age or height, and does not automatically accuse people.
+
+Premium annotated frames now show track id, class, confidence, zone name, dwell time, active/lost status, worker status, event count, and path trail with a clean security HUD style:
+
+```text
+http://127.0.0.1:8000/api/vision/hikvision/101/annotated
+```
+
+Development formatting and lint checks:
+
+```powershell
+cd c:\System_security\System_security\backend
+pip install -r requirements-dev.txt
+python -m black app tests
+python -m ruff check app tests
+pytest
+```
+
 Manual callback body:
 
 ```json

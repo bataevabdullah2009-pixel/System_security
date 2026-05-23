@@ -107,7 +107,11 @@ def test_detection_annotated_route_returns_jpeg(monkeypatch, tmp_path) -> None:
         "detect_objects",
         lambda image_bytes, channel, snapshot_path=None: [fake_detection()],
     )
-    monkeypatch.setattr(detection_service, "draw_detections", lambda image_bytes, detections: image_bytes)
+    monkeypatch.setattr(
+        detection_service,
+        "draw_detections",
+        lambda image_bytes, detections: image_bytes,
+    )
     monkeypatch.setattr(
         detection_service,
         "save_annotated_snapshot",

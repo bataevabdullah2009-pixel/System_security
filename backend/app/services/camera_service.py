@@ -4,7 +4,6 @@ from pathlib import Path
 
 from app.services import hikvision_snapshot_service
 
-
 HIKVISION_CHANNELS = ("101", "102", "201", "202")
 
 

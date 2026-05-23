@@ -46,7 +46,9 @@ class UltralyticsYoloBackend:
         try:
             return YOLO(model_name)
         except Exception as exc:
-            raise DetectionModelError(f"Could not load detection model {model_name!r}: {exc}") from exc
+            raise DetectionModelError(
+                f"Could not load detection model {model_name!r}: {exc}"
+            ) from exc
 
     def detect(
         self,
@@ -66,7 +68,9 @@ class UltralyticsYoloBackend:
                 verbose=False,
             )
         except Exception as exc:
-            raise DetectionModelError(f"Object detection inference failed: {exc}") from exc
+            raise DetectionModelError(
+                f"Object detection inference failed: {exc}"
+            ) from exc
 
         detections: list[DetectionResult] = []
         for result in raw_results:

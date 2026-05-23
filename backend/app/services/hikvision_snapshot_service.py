@@ -12,7 +12,6 @@ import httpx
 import numpy as np
 from dotenv import load_dotenv
 
-
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -58,7 +57,9 @@ def load_config() -> HikvisionSnapshotConfig:
         if not value
     ]
     if missing:
-        raise HikvisionSnapshotError(f"Missing required env values: {', '.join(missing)}")
+        raise HikvisionSnapshotError(
+            f"Missing required env values: {', '.join(missing)}"
+        )
 
     try:
         port = int(port_raw)
@@ -84,10 +85,20 @@ def mask_url(url: str) -> str:
     else:
         masked_credentials = "***"
 
-    return urlunsplit((parts.scheme, f"{masked_credentials}@{host}", parts.path, parts.query, parts.fragment))
+    return urlunsplit(
+        (
+            parts.scheme,
+            f"{masked_credentials}@{host}",
+            parts.path,
+            parts.query,
+            parts.fragment,
+        )
+    )
 
 
-def _snapshot_url_for_config(config: HikvisionSnapshotConfig, channel: int | str) -> str:
+def _snapshot_url_for_config(
+    config: HikvisionSnapshotConfig, channel: int | str
+) -> str:
     return build_snapshot_url(config.host, config.port, channel)
 
 
@@ -97,7 +108,9 @@ def _short_response_reason(response: httpx.Response) -> str:
     if len(body) > 160:
         body = body[:157] + "..."
     if body:
-        return f"status={response.status_code}; content-type={content_type}; body={body}"
+        return (
+            f"status={response.status_code}; content-type={content_type}; body={body}"
+        )
     return f"status={response.status_code}; content-type={content_type}"
 
 
@@ -146,7 +159,9 @@ def fetch_snapshot(channel: int | str) -> bytes:
                 response = client.get(url, auth=auth)
             except httpx.HTTPError as exc:
                 last_error = f"{auth_name} network error: {exc}"
-                logger.warning("Hikvision snapshot request failed for %s: %s", masked, last_error)
+                logger.warning(
+                    "Hikvision snapshot request failed for %s: %s", masked, last_error
+                )
                 continue
 
             content_type = response.headers.get("content-type", "").lower()
@@ -173,7 +188,9 @@ def save_snapshot(channel: int | str) -> Path:
 def save_snapshot_bytes(channel: int | str, image_bytes: bytes) -> Path:
     validation = validate_snapshot(image_bytes)
     if not validation.ok:
-        raise HikvisionSnapshotError(f"Invalid snapshot for channel {channel}: {validation.error}")
+        raise HikvisionSnapshotError(
+            f"Invalid snapshot for channel {channel}: {validation.error}"
+        )
 
     SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
 

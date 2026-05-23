@@ -10,7 +10,7 @@ import numpy as np
 from dotenv import load_dotenv
 
 from app.services.detection_backends.base import (
-    BoundingBox,
+    BoundingBox as BoundingBox,
     DetectionBackend,
     DetectionModelError,
     DetectionResult,
@@ -21,7 +21,6 @@ from app.services.detection_backends.ncnn_backend import NcnnBackend
 from app.services.detection_backends.onnxruntime_backend import OnnxRuntimeBackend
 from app.services.detection_backends.openvino_backend import OpenVinoBackend
 from app.services.detection_backends.ultralytics_backend import UltralyticsYoloBackend
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 STORAGE_ROOT = PROJECT_ROOT / "storage"
@@ -61,12 +60,20 @@ def _load_env() -> None:
 
 def detection_enabled() -> bool:
     _load_env()
-    return os.getenv("DETECTION_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv("DETECTION_ENABLED", "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def detection_backend_name() -> str:
     _load_env()
-    return os.getenv("DETECTION_BACKEND", "ultralytics_yolo").strip().lower() or "ultralytics_yolo"
+    return (
+        os.getenv("DETECTION_BACKEND", "ultralytics_yolo").strip().lower()
+        or "ultralytics_yolo"
+    )
 
 
 def detection_model_name() -> str:
@@ -157,7 +164,9 @@ def detect_objects(
     snapshot_path: str | None = None,
 ) -> list[DetectionResult]:
     backend = get_detection_backend()
-    return backend.detect(image_bytes=image_bytes, channel=str(channel), snapshot_path=snapshot_path)
+    return backend.detect(
+        image_bytes=image_bytes, channel=str(channel), snapshot_path=snapshot_path
+    )
 
 
 def filter_detections(results: list[DetectionResult]) -> list[DetectionResult]:

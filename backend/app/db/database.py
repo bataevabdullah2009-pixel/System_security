@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -40,7 +39,9 @@ def get_engine():
 
 @lru_cache(maxsize=1)
 def get_session_factory():
-    return sessionmaker(bind=get_engine(), autocommit=False, autoflush=False, expire_on_commit=False)
+    return sessionmaker(
+        bind=get_engine(), autocommit=False, autoflush=False, expire_on_commit=False
+    )
 
 
 def init_db() -> None:

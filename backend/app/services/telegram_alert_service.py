@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 
 from app.db.database import PROJECT_ROOT
 
-
 logger = logging.getLogger(__name__)
 
 _LAST_ALERT_AT: dict[str, datetime] = {}
@@ -168,10 +167,15 @@ def send_text_message(
     if keyboard is not None:
         payload["reply_markup"] = keyboard
 
-    response = httpx.post(_telegram_url("sendMessage", token), json=payload, timeout=10.0)
+    response = httpx.post(
+        _telegram_url("sendMessage", token), json=payload, timeout=10.0
+    )
     response.raise_for_status()
     data = response.json()
-    return {"sent": bool(data.get("ok", False)), "reason": None if data.get("ok") else "telegram_api_error"}
+    return {
+        "sent": bool(data.get("ok", False)),
+        "reason": None if data.get("ok") else "telegram_api_error",
+    }
 
 
 def send_photo_message(
@@ -200,7 +204,10 @@ def send_photo_message(
         )
     response.raise_for_status()
     body = response.json()
-    return {"sent": bool(body.get("ok", False)), "reason": None if body.get("ok") else "telegram_api_error"}
+    return {
+        "sent": bool(body.get("ok", False)),
+        "reason": None if body.get("ok") else "telegram_api_error",
+    }
 
 
 def handle_callback_update(callback_data: str) -> dict[str, object]:
