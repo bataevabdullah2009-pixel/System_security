@@ -479,3 +479,19 @@ Manual callback body:
   "callback_data": "event:1:acknowledged"
 }
 ```
+
+### Telegram webhook
+
+`POST /api/telegram/webhook` accepts real Telegram Update JSON and handles `callback_query` button presses. When a user taps an inline button in Telegram, the backend parses callback data like `event:1:acknowledged`, updates the event status, and answers the callback query through Telegram API.
+
+Localhost cannot receive Telegram webhooks directly because Telegram needs a public HTTPS URL. For local testing, expose the backend with ngrok or cloudflared, then point Telegram to:
+
+```text
+https://YOUR_PUBLIC_URL/api/telegram/webhook
+```
+
+Production webhook setup should use a real public domain with HTTPS. Manual local callback testing remains available through:
+
+```text
+POST http://127.0.0.1:8000/api/telegram/callback
+```

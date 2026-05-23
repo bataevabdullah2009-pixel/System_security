@@ -30,6 +30,8 @@ def test_telegram_diagnose(monkeypatch) -> None:
         "bot_configured": True,
         "chat_configured": True,
         "token_masked": "123456:***",
+        "webhook_supported": True,
+        "callback_endpoint": "/api/telegram/webhook",
     }
 
 

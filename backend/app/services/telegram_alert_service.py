@@ -226,6 +226,68 @@ def handle_callback_update(callback_data: str) -> dict[str, object]:
     return {"ok": True, "event": event}
 
 
+def answer_callback_query(
+    callback_query_id: str,
+    text: str | None = None,
+) -> dict[str, object]:
+    if not telegram_enabled():
+        return {"sent": False, "reason": "telegram_disabled"}
+
+    token = telegram_bot_token()
+    if not _is_configured(token):
+        return {"sent": False, "reason": "telegram_not_configured"}
+
+    payload: dict[str, object] = {"callback_query_id": callback_query_id}
+    if text is not None:
+        payload["text"] = text
+
+    try:
+        response = httpx.post(
+            _telegram_url("answerCallbackQuery", token),
+            json=payload,
+            timeout=10.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return {
+            "sent": bool(data.get("ok", False)),
+            "reason": None if data.get("ok") else "telegram_api_error",
+        }
+    except Exception as exc:
+        safe_error = _safe_error(exc, token)
+        logger.warning(
+            "Telegram answerCallbackQuery failed callback_query_id=%s token=%s error=%s",
+            callback_query_id,
+            mask_token(token),
+            safe_error,
+        )
+        return {"sent": False, "reason": f"telegram_error: {safe_error}"}
+
+
+def handle_telegram_update(update_json: dict[str, Any]) -> dict[str, object]:
+    callback_query = update_json.get("callback_query")
+    if not callback_query:
+        return {"ok": True, "ignored": True}
+
+    callback_query_id = str(callback_query.get("id", ""))
+    callback_data = callback_query.get("data")
+    if not callback_query_id:
+        return {"ok": False, "reason": "missing_callback_query_id"}
+    if not callback_data:
+        answer = answer_callback_query(callback_query_id, text="Invalid callback")
+        return {
+            "ok": False,
+            "reason": "missing_callback_data",
+            "answer_callback_query": answer,
+        }
+
+    result = handle_callback_update(str(callback_data))
+    answer_text = "Status updated" if result.get("ok") else str(result.get("reason"))
+    answer = answer_callback_query(callback_query_id, text=answer_text)
+    result["answer_callback_query"] = answer
+    return result
+
+
 def diagnose() -> dict[str, object]:
     token = telegram_bot_token()
     chat_id = telegram_chat_id()
@@ -234,6 +296,8 @@ def diagnose() -> dict[str, object]:
         "bot_configured": _is_configured(token),
         "chat_configured": _is_configured(chat_id),
         "token_masked": mask_token(token),
+        "webhook_supported": True,
+        "callback_endpoint": "/api/telegram/webhook",
     }
 
 

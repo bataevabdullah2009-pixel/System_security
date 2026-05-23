@@ -35,3 +35,8 @@ def handle_telegram_callback(payload: TelegramCallbackPayload) -> dict[str, obje
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result["reason"])
     return result
+
+
+@router.post("/webhook")
+def handle_telegram_webhook(payload: dict[str, object]) -> dict[str, object]:
+    return telegram_alert_service.handle_telegram_update(payload)
