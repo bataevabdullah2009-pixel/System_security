@@ -338,3 +338,61 @@ DETECTION_MODEL=yolo11n.pt
 ```
 
 The `yolo11n.pt` model is not committed to Git. In YOLO development mode Ultralytics can download it automatically on first use. Production clients should not need a powerful PC at the first stage: the intended path is model export to ONNX/OpenVINO/NCNN, or using AI cameras / edge boxes that perform inference outside the main backend.
+
+## Phase 3 — Event Engine MVP
+
+Detection finds objects on camera snapshots. Event Engine turns those detections into security events and stores them in SQLite.
+
+Current event types:
+
+- `person_detected`
+- `vehicle_detected`
+- `camera_snapshot_error`
+- `detection_error`
+
+Each event has a status:
+
+- `new`
+- `acknowledged`
+- `resolved`
+- `ignored`
+
+Cooldown protects the system from creating the same event every second. The key is built from channel and event type, for example `101:vehicle_detected`. If the latest event with the same key is newer than `EVENT_COOLDOWN_SECONDS`, the new event is skipped.
+
+Telegram and face recognition are still not added in this phase.
+
+Run backend:
+
+```powershell
+cd c:\System_security\System_security\backend
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Mock mode for weak PCs and tests:
+
+```env
+DETECTION_BACKEND=mock
+EVENT_ENABLED=true
+EVENT_COOLDOWN_SECONDS=60
+DATABASE_URL=sqlite:///./smartguard.db
+```
+
+Checks:
+
+```text
+GET  http://127.0.0.1:8000/api/events
+POST http://127.0.0.1:8000/api/events/process/hikvision/101
+GET  http://127.0.0.1:8000/api/events/diagnose/hikvision
+GET  http://127.0.0.1:8000/api/events/{event_id}
+PATCH http://127.0.0.1:8000/api/events/{event_id}/status
+```
+
+Status update body:
+
+```json
+{
+  "status": "acknowledged"
+}
+```
