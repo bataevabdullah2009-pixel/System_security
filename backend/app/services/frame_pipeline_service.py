@@ -180,6 +180,12 @@ def process_frame(
         if track.status != "expired":
             valid_objects.append(track)
 
+    # Active cache purge: write back only non-expired tracks to tracking_service global state
+    tracking_service._TRACKS_BY_CHANNEL[channel_key] = [
+        t for t in valid_objects if t.status != "expired"
+    ]
+
+
     # 3. Apply Exponential Moving Average (EMA) BBox Smoothing
     alpha = get_bbox_smoothing_alpha()
     for track in valid_objects:

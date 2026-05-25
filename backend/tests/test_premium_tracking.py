@@ -230,3 +230,39 @@ def test_state_includes_target_object():
     assert state["target"]["locked"] is True
     assert state["target"]["track_id"] == 1
     assert state["target"]["class_name"] == "car"
+
+
+def test_expired_tracks_are_deleted_from_global_state(monkeypatch):
+    """Verify that expired tracks are completely deleted from tracking_service._TRACKS_BY_CHANNEL."""
+    monkeypatch.setenv("TRACK_TTL_SECONDS", "1.5")
+    now = datetime.now(timezone.utc)
+    track = TrackedObject(
+        track_id=42,
+        channel="101",
+        class_name="person",
+        confidence=0.88,
+        bbox=[10, 10, 50, 50],
+        center=[30, 30],
+        path=[[30, 30]],
+        first_seen_at=now - timedelta(seconds=10),
+        last_seen_at=now - timedelta(seconds=5),
+        status="active",
+    )
+    tracking_service._TRACKS_BY_CHANNEL["101"] = [track]
+
+    img = np.zeros((120, 160, 3), dtype=np.uint8)
+    ok, encoded = cv2.imencode(".jpg", img)
+    assert ok
+    image_bytes = encoded.tobytes()
+
+    frame_pipeline_service.process_frame(
+        channel="101",
+        image_bytes=image_bytes,
+        now=now,
+        force_detection=False,
+    )
+
+    # Verify cache purge
+    tracks_in_cache = tracking_service._TRACKS_BY_CHANNEL.get("101", [])
+    assert len(tracks_in_cache) == 0
+

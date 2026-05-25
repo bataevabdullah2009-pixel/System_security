@@ -206,6 +206,8 @@ def _mark_lost_tracks(tracks: list[TrackedObject], now: datetime) -> None:
             track.status = "lost"
 
 
+
+
 def _bbox_to_list(detection: DetectionResult) -> list[int]:
     bbox = detection.bbox
     return [int(bbox.x1), int(bbox.y1), int(bbox.x2), int(bbox.y2)]

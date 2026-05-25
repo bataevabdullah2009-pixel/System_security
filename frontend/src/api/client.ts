@@ -94,12 +94,28 @@ async function requestJson<T>(
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with ${response.status}`);
+    const text = await response.text();
+    let detail = text;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed.detail === "string") {
+        detail = parsed.detail;
+      } else if (parsed && typeof parsed.message === "string") {
+        detail = parsed.message;
+      }
+    } catch {
+      // Not JSON
+    }
+    throw new Error(
+      `Endpoint ${path} failed with status ${response.status}: ${
+        detail || response.statusText
+      }`,
+    );
   }
 
   return response.json() as Promise<T>;
 }
+
 
 export function getHealth(): Promise<HealthStatus> {
   return requestJson<HealthStatus>("/health");

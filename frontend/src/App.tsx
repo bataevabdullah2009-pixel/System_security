@@ -92,7 +92,7 @@ function App() {
 
   useEffect(() => {
     refreshDashboard();
-    const intervalId = window.setInterval(refreshDashboard, 3000);
+    const intervalId = window.setInterval(refreshDashboard, 1000);
     return () => window.clearInterval(intervalId);
   }, [refreshDashboard]);
 
@@ -332,13 +332,10 @@ function App() {
 }
 
 function formatDashboardError(label: string, error: unknown): string {
-  if (error instanceof TypeError) {
-    return label;
+  if (error instanceof Error) {
+    return `${label}: ${error.message}`;
   }
-  if (error instanceof Error && error.message.includes("Failed to fetch")) {
-    return label;
-  }
-  return label;
+  return `${label}: ${String(error)}`;
 }
 
 export default App;

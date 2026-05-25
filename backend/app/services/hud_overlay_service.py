@@ -110,9 +110,10 @@ def draw_premium_hud(
 
     for obj in objects:
         status = getattr(obj, "status", "active")
-        if status in ("lost", "expired"):
-            # Never draw lost/expired tracks in live HUD
+        if status != "active":
+            # Never draw non-active tracks in live HUD
             continue
+
 
         track_id = getattr(obj, "track_id", 0)
         class_name = getattr(obj, "class_name", "object")
