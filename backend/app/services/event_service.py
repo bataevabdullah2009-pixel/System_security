@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from sqlalchemy import desc, select
+from sqlalchemy import desc, select, delete
 
 from app.db.database import PROJECT_ROOT, session_scope
 from app.db.models import Event
@@ -566,3 +566,13 @@ def _send_telegram_alert(event: Event) -> dict[str, object]:
             "Telegram alert integration failed for event_id=%s error=%s", event.id, exc
         )
         return {"sent": False, "reason": f"telegram_error: {exc}"}
+
+
+def clear_events() -> int:
+    with session_scope() as session:
+        from sqlalchemy import delete
+        statement = delete(Event)
+        result = session.execute(statement)
+        session.flush()
+        return result.rowcount
+

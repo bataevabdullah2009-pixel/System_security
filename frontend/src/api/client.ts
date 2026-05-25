@@ -37,7 +37,9 @@ export interface TargetStatus {
   track_id: number | null;
   class_name: string | null;
   status: string | null;
+  lock_status?: string | null;
 }
+
 
 export interface VisionState {
   channel: string;
@@ -207,6 +209,12 @@ export function updateEventStatus(
   });
 }
 
+export function clearEvents(): Promise<{ status: string; cleared_count: number }> {
+  return requestJson<{ status: string; cleared_count: number }>("/api/events/clear", {
+    method: "POST",
+  });
+}
+
 export function getVisionStreamUrl(channel: string): string {
   return `${API_BASE_URL}/api/vision/hikvision/${channel}/stream.mjpg`;
 }
@@ -259,6 +267,7 @@ function normalizeTargetStatus(payload: Record<string, unknown>): TargetStatus {
         : null,
     class_name: typeof payload.class_name === "string" ? payload.class_name : null,
     status: typeof payload.status === "string" ? payload.status : null,
+    lock_status: typeof payload.lock_status === "string" ? payload.lock_status : null,
   };
 }
 

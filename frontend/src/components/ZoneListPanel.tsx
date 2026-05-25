@@ -1,6 +1,6 @@
 import { MapPinned } from "lucide-react";
-
 import { TrackedObject } from "../api/client";
+import { useTranslation } from "../api/i18n";
 
 interface ZoneListPanelProps {
   objects: TrackedObject[];
@@ -13,29 +13,30 @@ interface ZoneSummary {
 }
 
 function ZoneListPanel({ objects }: ZoneListPanelProps) {
+  const { t } = useTranslation();
   const zones = buildZoneSummary(objects);
 
   return (
-    <section className="panel">
+    <section className="panel zones-panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Zones</span>
-          <h2>Observed zones</h2>
+          <span className="eyebrow">{t("zonesList")}</span>
+          <h2>{t("zonesList")}</h2>
         </div>
         <MapPinned size={18} />
       </div>
 
       <div className="zone-list">
         {zones.length === 0 ? (
-          <div className="empty-state">No zone activity</div>
+          <div className="empty-state">{t("noTrackedObjects")}</div>
         ) : (
           zones.map((zone) => (
             <div className="zone-row" key={zone.id}>
               <div>
-                <strong>{zone.id}</strong>
-                <span>{zone.activeCount} active tracks</span>
+                <strong>{zone.id.toUpperCase()}</strong>
+                <span>{t("activeObjectsCount", { count: zone.activeCount })}</span>
               </div>
-              <span>{zone.maxDwellSeconds.toFixed(1)}s</span>
+              <span className="dwell-text">{zone.maxDwellSeconds.toFixed(1)}s</span>
             </div>
           ))
         )}

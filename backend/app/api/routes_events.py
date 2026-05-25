@@ -58,6 +58,13 @@ def list_events(
     )
 
 
+@router.post("/clear")
+def clear_all_events() -> dict[str, object]:
+    count = event_service.clear_events()
+    return {"status": "ok", "cleared_count": count}
+
+
+
 @router.post("/process/hikvision/{channel}")
 def process_hikvision_channel(channel: str) -> dict[str, object]:
     _validate_channel(channel)

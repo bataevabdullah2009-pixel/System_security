@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, AlertTriangle, RadioTower, ShieldCheck } from "lucide-react";
+import { Activity, AlertTriangle, RadioTower, ShieldCheck, Camera } from "lucide-react";
 
 import {
   EventActionStatus,
@@ -17,6 +17,7 @@ import {
   lockTargetByCoordinates,
   clearTarget,
   setHudStyle as apiSetHudStyle,
+  clearEvents,
 } from "./api/client";
 import CameraLiveView from "./components/CameraLiveView";
 import CameraStatusCard from "./components/CameraStatusCard";
@@ -26,11 +27,14 @@ import VisionOverlayPanel from "./components/VisionOverlayPanel";
 import WorkerControlPanel from "./components/WorkerControlPanel";
 import ZoneListPanel from "./components/ZoneListPanel";
 import TargetLockControlPanel from "./components/TargetLockControlPanel";
+import { useTranslation } from "./api/i18n";
+
 
 
 const CHANNEL = "101";
 
 function App() {
+  const { t, lang, setLang } = useTranslation();
   const [visionState, setVisionState] = useState<VisionState | null>(null);
   const [workerStatus, setWorkerStatus] = useState<VisionWorkerStatus | null>(
     null,
@@ -195,6 +199,16 @@ function App() {
     }
   };
 
+  const handleClearEvents = async () => {
+    try {
+      await clearEvents();
+      setEvents([]);
+      await refreshDashboard();
+    } catch (error) {
+      setEventsError(formatDashboardError("Clear events failed", error));
+    }
+  };
+
   const mergedWorkerStatus = useMemo<VisionWorkerStatus>(() => {
     const stateWorker = visionState?.worker ?? {};
     return {
@@ -218,7 +232,7 @@ function App() {
   }, [visionState, workerStatus]);
 
   const activeObjects =
-    visionState?.objects.filter((object) => object.status !== "lost") ?? [];
+    visionState?.objects.filter((object) => object.status === "active") ?? [];
   const newEvents = events.filter((event) => event.status === "new").length;
   const backendOnline = backendHealthError === null;
   const statusWarnings = [
@@ -236,41 +250,67 @@ function App() {
               <ShieldCheck size={21} strokeWidth={2.2} />
             </div>
             <div>
-              <span className="eyebrow">SmartGuard AI</span>
-              <h1>Security Operations</h1>
+              <span className="eyebrow">{t("brandName")}</span>
+              <h1>{t("securityOperations")}</h1>
             </div>
           </div>
           <div className="system-strip">
             <div className="status-chip">
               <RadioTower size={16} />
-              <span>{backendOnline ? "Backend online" : "Backend offline"}</span>
+              <span>{backendOnline ? t("serverOnline") : t("serverOffline")}</span>
             </div>
             {visionStateError ? (
               <div className="status-chip status-chip-warning">
                 <AlertTriangle size={16} />
-                <span>Vision API warning</span>
+                <span>{t("visionWarning")}</span>
               </div>
             ) : null}
             {eventsError ? (
               <div className="status-chip status-chip-warning">
                 <AlertTriangle size={16} />
-                <span>Events API warning</span>
+                <span>{t("eventsWarning")}</span>
               </div>
             ) : null}
             <div className="status-chip">
-              <Activity size={16} />
-              <span>{activeObjects.length} active objects</span>
+              <Camera size={16} />
+              <span>
+                {t("channelLabel", { channel: CHANNEL })} ({backendOnline && visionState?.updated_at ? t("statusOnline") : t("statusOffline")})
+              </span>
             </div>
             <div className="status-chip">
-              <RadioTower size={16} />
+              <Activity size={16} />
               <span>
-                {mergedWorkerStatus.running ? "Worker running" : "Worker stopped"}
+                {activeObjects.length > 0
+                  ? t("activeObjectsCount", { count: activeObjects.length })
+                  : t("activeObjectsZero")}
               </span>
             </div>
             <div className="status-chip status-chip-alert">
               <AlertTriangle size={16} />
-              <span>{newEvents} new events</span>
+              <span>
+                {newEvents > 0
+                  ? t("newEventsCount", { count: newEvents })
+                  : t("newEventsZero")}
+              </span>
             </div>
+            <button
+              onClick={() => setLang(lang === "ru" ? "en" : "ru")}
+              className="btn-toggle lang-switcher-btn"
+              style={{
+                background: "rgba(143, 167, 176, 0.08)",
+                border: "1px solid rgba(143, 167, 176, 0.2)",
+                color: "#c3d1d6",
+                padding: "4px 8px",
+                borderRadius: "4px",
+                fontSize: "0.75rem",
+                fontWeight: "bold",
+                cursor: "pointer",
+                marginLeft: "12px",
+                textTransform: "uppercase"
+              }}
+            >
+              {lang === "ru" ? "EN" : "RU"}
+            </button>
           </div>
         </header>
       }
@@ -320,6 +360,7 @@ function App() {
           statusError={eventsError}
           loadingAction={loadingAction}
           onStatusChange={handleEventStatus}
+          onClearEvents={handleClearEvents}
         />
       }
       footer={

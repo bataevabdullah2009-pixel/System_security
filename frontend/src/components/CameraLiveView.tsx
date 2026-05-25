@@ -6,6 +6,7 @@ import {
   getAnnotatedFrameUrl,
   getVisionStreamUrl,
 } from "../api/client";
+import { useTranslation } from "../api/i18n";
 
 interface CameraLiveViewProps {
   channel: string;
@@ -14,6 +15,7 @@ interface CameraLiveViewProps {
 }
 
 function CameraLiveView({ channel, workerStatus, onVideoClick }: CameraLiveViewProps) {
+  const { t } = useTranslation();
   const [useFallbackFrame, setUseFallbackFrame] = useState(false);
   const [fallbackKey, setFallbackKey] = useState(0);
   
@@ -46,8 +48,8 @@ function CameraLiveView({ channel, workerStatus, onVideoClick }: CameraLiveViewP
     <section className="panel live-panel">
       <div className="panel-heading live-heading">
         <div>
-          <span className="eyebrow">Live camera</span>
-          <h2>Channel {channel}</h2>
+          <span className="eyebrow">{t("liveCamera")}</span>
+          <h2>{t("channelLabel", { channel })}</h2>
         </div>
         <div
           className={`live-state ${
@@ -59,7 +61,7 @@ function CameraLiveView({ channel, workerStatus, onVideoClick }: CameraLiveViewP
           ) : (
             <PauseCircle size={16} />
           )}
-          <span>{workerStatus.running ? "Worker running" : "Worker offline"}</span>
+          <span>{workerStatus.running ? t("workerRunning") : t("workerOffline")}</span>
         </div>
       </div>
 
@@ -83,7 +85,7 @@ function CameraLiveView({ channel, workerStatus, onVideoClick }: CameraLiveViewP
             <Camera size={14} />
             Hikvision {channel}
           </span>
-          <span>{useFallbackFrame ? "Annotated frame" : "MJPEG stream"}</span>
+          <span>{useFallbackFrame ? t("annotatedFrame") : t("mjpegStream")}</span>
         </div>
       </div>
     </section>

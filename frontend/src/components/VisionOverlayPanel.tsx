@@ -1,6 +1,7 @@
 import { Crosshair, Route } from "lucide-react";
 
 import { TrackedObject } from "../api/client";
+import { useTranslation } from "../api/i18n";
 
 interface VisionOverlayPanelProps {
   objects: TrackedObject[];
@@ -8,12 +9,14 @@ interface VisionOverlayPanelProps {
 }
 
 function VisionOverlayPanel({ objects, statusError }: VisionOverlayPanelProps) {
+  const { t } = useTranslation();
+
   return (
     <section className="panel overlay-panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Vision overlay</span>
-          <h2>Active objects</h2>
+          <span className="eyebrow">{t("visionOverlay")}</span>
+          <h2>{t("activeObjectsTitle")}</h2>
         </div>
         <div className="count-pill">{objects.length}</div>
       </div>
@@ -23,7 +26,7 @@ function VisionOverlayPanel({ objects, statusError }: VisionOverlayPanelProps) {
           <div className="inline-warning">{statusError}</div>
         ) : null}
         {objects.length === 0 ? (
-          <div className="empty-state">No tracked objects</div>
+          <div className="empty-state">{t("noTrackedObjects")}</div>
         ) : (
           objects.map((object) => {
             const dwellSeconds = Math.max(
@@ -35,21 +38,21 @@ function VisionOverlayPanel({ objects, statusError }: VisionOverlayPanelProps) {
                 <div className="object-main">
                   <div className="track-badge">#{object.track_id}</div>
                   <div>
-                    <strong>{object.class_name}</strong>
-                    <span>{Math.round(object.confidence * 100)}% confidence</span>
+                    <strong className="uppercase">{object.class_name}</strong>
+                    <span>{t("confidenceText")}: {Math.round(object.confidence * 100)}%</span>
                   </div>
                 </div>
                 <div className="object-meta">
                   <span>
                     <Crosshair size={14} />
-                    {object.zone_ids.length ? object.zone_ids.join(", ") : "no zone"}
+                    {object.zone_ids.length ? object.zone_ids.join(", ") : t("noZone")}
                   </span>
                   <span>
                     <Route size={14} />
-                    {dwellSeconds.toFixed(1)}s dwell
+                    {t("dwellText")}: {dwellSeconds.toFixed(1)}s
                   </span>
                   <span className={`mini-status ${object.status}`}>
-                    {object.status}
+                    {object.status === "active" ? t("statusOnline") : object.status}
                   </span>
                 </div>
               </article>
