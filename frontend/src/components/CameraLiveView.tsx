@@ -10,17 +10,37 @@ import {
 interface CameraLiveViewProps {
   channel: string;
   workerStatus: VisionWorkerStatus;
+  onVideoClick?: (x: number, y: number) => void;
 }
 
-function CameraLiveView({ channel, workerStatus }: CameraLiveViewProps) {
+function CameraLiveView({ channel, workerStatus, onVideoClick }: CameraLiveViewProps) {
   const [useFallbackFrame, setUseFallbackFrame] = useState(false);
   const [fallbackKey, setFallbackKey] = useState(0);
+  
   const imageUrl = useMemo(() => {
     if (useFallbackFrame) {
       return `${getAnnotatedFrameUrl(channel)}?t=${fallbackKey}`;
     }
     return getVisionStreamUrl(channel);
   }, [channel, fallbackKey, useFallbackFrame]);
+
+  const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
+    const img = event.currentTarget;
+    const rect = img.getBoundingClientRect();
+    const xClick = event.clientX - rect.left;
+    const yClick = event.clientY - rect.top;
+    
+    // Scale browser coordinates to natural image dimensions
+    const scaleX = img.naturalWidth / rect.width;
+    const scaleY = img.naturalHeight / rect.height;
+    
+    const xOrig = Math.round(xClick * scaleX);
+    const yOrig = Math.round(yClick * scaleY);
+    
+    if (onVideoClick) {
+      onVideoClick(xOrig, yOrig);
+    }
+  };
 
   return (
     <section className="panel live-panel">
@@ -48,6 +68,8 @@ function CameraLiveView({ channel, workerStatus }: CameraLiveViewProps) {
           key={imageUrl}
           src={imageUrl}
           alt={`Channel ${channel} live security view`}
+          style={{ cursor: "crosshair" }}
+          onClick={handleImageClick}
           onError={() => {
             if (!useFallbackFrame) {
               setUseFallbackFrame(true);
@@ -67,5 +89,6 @@ function CameraLiveView({ channel, workerStatus }: CameraLiveViewProps) {
     </section>
   );
 }
+
 
 export default CameraLiveView;

@@ -14,6 +14,7 @@ export interface VisionWorkerStatus {
   last_update_at?: string | null;
   last_error?: string | null;
   updates_count: number;
+  measured_fps?: number | null;
 }
 
 export interface TrackedObject {
@@ -31,10 +32,18 @@ export interface TrackedObject {
   dwell: Record<string, number>;
 }
 
+export interface TargetStatus {
+  locked: boolean;
+  track_id: number | null;
+  class_name: string | null;
+  status: string | null;
+}
+
 export interface VisionState {
   channel: string;
   updated_at: string | null;
   worker: Partial<VisionWorkerStatus>;
+  target: TargetStatus;
   objects: TrackedObject[];
   snapshot_path?: string;
   annotated_frame_path?: string;
@@ -126,6 +135,48 @@ export function getVisionWorkerStatus(
   );
 }
 
+export function lockTarget(channel: string, trackId: number): Promise<TargetStatus> {
+  return requestJson<TargetStatus>(`/api/vision/hikvision/${channel}/target/lock`, {
+    method: "POST",
+    body: JSON.stringify({ track_id: trackId }),
+  });
+}
+
+export function lockTargetByCoordinates(
+  channel: string,
+  x: number,
+  y: number,
+): Promise<TargetStatus> {
+  return requestJson<TargetStatus>(`/api/vision/hikvision/${channel}/target/lock`, {
+    method: "POST",
+    body: JSON.stringify({ x: Math.round(x), y: Math.round(y) }),
+  });
+}
+
+export function clearTarget(channel: string): Promise<TargetStatus> {
+  return requestJson<TargetStatus>(`/api/vision/hikvision/${channel}/target/clear`, {
+    method: "POST",
+  });
+}
+
+export function setHudStyle(
+  channel: string,
+  style: string,
+): Promise<{ status: string; hud_style: string }> {
+  return requestJson<{ status: string; hud_style: string }>(
+    `/api/vision/hikvision/${channel}/hud_style`,
+    {
+      method: "POST",
+      body: JSON.stringify({ style }),
+    },
+  );
+}
+
+
+export function getTargetStatus(channel: string): Promise<TargetStatus> {
+  return requestJson<TargetStatus>(`/api/vision/hikvision/${channel}/target/status`);
+}
+
 export function getEvents(): Promise<SecurityEvent[]> {
   return requestJson<SecurityEvent[]>("/api/events?limit=50");
 }
@@ -160,6 +211,9 @@ function normalizeVisionState(payload: Record<string, unknown>): VisionState {
     updated_at:
       typeof payload.updated_at === "string" ? payload.updated_at : null,
     worker: isRecord(payload.worker) ? payload.worker : {},
+    target: isRecord(payload.target)
+      ? normalizeTargetStatus(payload.target)
+      : { locked: false, track_id: null, class_name: null, status: null },
     objects: rawObjects.filter(isRecord).map(normalizeTrackedObject),
     snapshot_path:
       typeof payload.snapshot_path === "string" ? payload.snapshot_path : undefined,
@@ -177,6 +231,18 @@ function normalizeVisionState(payload: Record<string, unknown>): VisionState {
             : [],
         }
       : undefined,
+  };
+}
+
+function normalizeTargetStatus(payload: Record<string, unknown>): TargetStatus {
+  return {
+    locked: Boolean(payload.locked ?? false),
+    track_id:
+      payload.track_id !== null && payload.track_id !== undefined
+        ? Number(payload.track_id)
+        : null,
+    class_name: typeof payload.class_name === "string" ? payload.class_name : null,
+    status: typeof payload.status === "string" ? payload.status : null,
   };
 }
 

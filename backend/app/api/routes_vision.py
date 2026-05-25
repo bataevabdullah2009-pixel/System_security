@@ -109,3 +109,54 @@ def stream_hikvision_vision_mjpeg(channel: str) -> StreamingResponse:
         _mjpeg_generator(channel),
         media_type="multipart/x-mixed-replace; boundary=frame",
     )
+
+
+from pydantic import BaseModel
+from app.services import target_lock_service, tracking_service
+
+class TargetLockRequest(BaseModel):
+    track_id: int | None = None
+    x: int | None = None
+    y: int | None = None
+
+@router.post("/hikvision/{channel}/target/lock")
+def lock_hikvision_target(channel: str, req: TargetLockRequest) -> dict[str, object]:
+    _validate_channel(channel)
+    if req.track_id is not None:
+        tracks = tracking_service.get_tracks(channel)
+        track = next((t for t in tracks if t.track_id == req.track_id), None)
+        class_name = track.class_name if track else None
+        status = track.status if track else "active"
+        return target_lock_service.lock_target_by_id(channel, req.track_id, class_name, status)
+    elif req.x is not None and req.y is not None:
+        tracks = tracking_service.get_tracks(channel)
+        active_tracks = [t for t in tracks if t.status == "active"]
+        return target_lock_service.lock_target_by_coordinates(channel, req.x, req.y, active_tracks)
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Must provide either track_id or x and y coordinates",
+        )
+
+@router.post("/hikvision/{channel}/target/clear")
+def clear_hikvision_target(channel: str) -> dict[str, object]:
+    _validate_channel(channel)
+    return target_lock_service.clear_target(channel)
+
+@router.get("/hikvision/{channel}/target/status")
+def get_hikvision_target_status(channel: str) -> dict[str, object]:
+    _validate_channel(channel)
+    return target_lock_service.get_target_status(channel)
+
+
+class HUDStyleRequest(BaseModel):
+    style: str
+
+@router.post("/hikvision/{channel}/hud_style")
+def set_hikvision_hud_style(channel: str, req: HUDStyleRequest) -> dict[str, object]:
+    _validate_channel(channel)
+    from app.services import hud_overlay_service
+    hud_overlay_service.set_hud_style(channel, req.style)
+    return {"status": "ok", "hud_style": req.style}
+
+

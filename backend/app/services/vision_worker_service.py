@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 import threading
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
@@ -19,6 +20,8 @@ class WorkerState:
     last_update_at: str | None = None
     last_error: str | None = None
     updates_count: int = 0
+    measured_fps: float | None = None
+    update_times: list[float] = field(default_factory=list)
     thread: threading.Thread | None = None
     stop_event: threading.Event | None = None
 
@@ -30,7 +33,9 @@ class WorkerState:
             "last_update_at": self.last_update_at,
             "last_error": self.last_error,
             "updates_count": self.updates_count,
+            "measured_fps": self.measured_fps,
         }
+
 
 
 _WORKERS: dict[str, WorkerState] = {}
@@ -138,6 +143,7 @@ def update_worker_once(channel: int | str) -> dict[str, object]:
             )
             _WORKERS[channel_key] = state
 
+    now_ts = time.time()
     try:
         result = vision_loop_service.update_once(channel_key)
     except Exception as exc:
@@ -149,7 +155,20 @@ def update_worker_once(channel: int | str) -> dict[str, object]:
         state.last_update_at = datetime.now(timezone.utc).isoformat()
         state.last_error = None
         state.updates_count += 1
+        
+        state.update_times.append(now_ts)
+        state.update_times = state.update_times[-10:]
+        if len(state.update_times) >= 2:
+            time_span = state.update_times[-1] - state.update_times[0]
+            if time_span > 0:
+                state.measured_fps = (len(state.update_times) - 1) / time_span
+            else:
+                state.measured_fps = 0.0
+        else:
+            state.measured_fps = 0.0
+
     return result
+
 
 
 def reset_worker_state() -> None:

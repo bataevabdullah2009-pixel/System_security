@@ -13,6 +13,10 @@ import {
   startVisionWorker,
   stopVisionWorker,
   updateEventStatus,
+  lockTarget,
+  lockTargetByCoordinates,
+  clearTarget,
+  setHudStyle as apiSetHudStyle,
 } from "./api/client";
 import CameraLiveView from "./components/CameraLiveView";
 import CameraStatusCard from "./components/CameraStatusCard";
@@ -21,6 +25,8 @@ import Layout from "./components/Layout";
 import VisionOverlayPanel from "./components/VisionOverlayPanel";
 import WorkerControlPanel from "./components/WorkerControlPanel";
 import ZoneListPanel from "./components/ZoneListPanel";
+import TargetLockControlPanel from "./components/TargetLockControlPanel";
+
 
 const CHANNEL = "101";
 
@@ -39,6 +45,7 @@ function App() {
     null,
   );
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [hudStyle, setHudStyle] = useState<string>("clean_hud");
 
   const refreshDashboard = useCallback(async () => {
     const [healthResult, stateResult, workerResult, eventsResult] =
@@ -125,6 +132,64 @@ function App() {
       setEventsError(null);
     } catch (error) {
       setEventsError(formatDashboardError("Events API unavailable", error));
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleLockStrongestTarget = async () => {
+    setLoadingAction("lock-strongest");
+    try {
+      if (visionState && visionState.objects.length > 0) {
+        const sorted = [...visionState.objects]
+          .filter((o) => o.status === "active")
+          .sort((a, b) => b.confidence - a.confidence);
+        if (sorted.length > 0) {
+          const strongest = sorted[0];
+          const updatedTarget = await lockTarget(CHANNEL, strongest.track_id);
+          setVisionState((prev) => prev ? { ...prev, target: updatedTarget } : null);
+        }
+      }
+    } catch (error) {
+      console.error("Lock strongest failed:", error);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleClearTargetLock = async () => {
+    setLoadingAction("clear-lock");
+    try {
+      const updatedTarget = await clearTarget(CHANNEL);
+      setVisionState((prev) => prev ? { ...prev, target: updatedTarget } : null);
+    } catch (error) {
+      console.error("Clear target failed:", error);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleVideoClick = async (x: number, y: number) => {
+    setLoadingAction("lock-coordinates");
+    try {
+      const updatedTarget = await lockTargetByCoordinates(CHANNEL, x, y);
+      setVisionState((prev) => prev ? { ...prev, target: updatedTarget } : null);
+      await refreshDashboard();
+    } catch (error) {
+      console.error("Coordinate lock failed:", error);
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleHudStyleChange = async (style: string) => {
+    setLoadingAction("hud-style");
+    try {
+      await apiSetHudStyle(CHANNEL, style);
+      setHudStyle(style);
+      await refreshDashboard();
+    } catch (error) {
+      console.error("HUD style change failed:", error);
     } finally {
       setLoadingAction(null);
     }
@@ -217,6 +282,14 @@ function App() {
             workerStatus={mergedWorkerStatus}
             backendOnline={backendOnline}
           />
+          <TargetLockControlPanel
+            target={visionState?.target ?? null}
+            loading={loadingAction !== null}
+            hudStyle={hudStyle}
+            onLockStrongest={handleLockStrongestTarget}
+            onClearLock={handleClearTargetLock}
+            onHudStyleChange={handleHudStyleChange}
+          />
           <WorkerControlPanel
             status={mergedWorkerStatus}
             statusError={workerStatusError}
@@ -230,7 +303,11 @@ function App() {
       }
       center={
         <>
-          <CameraLiveView channel={CHANNEL} workerStatus={mergedWorkerStatus} />
+          <CameraLiveView
+            channel={CHANNEL}
+            workerStatus={mergedWorkerStatus}
+            onVideoClick={handleVideoClick}
+          />
           <VisionOverlayPanel
             objects={visionState?.objects ?? []}
             statusError={visionStateError}
