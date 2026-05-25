@@ -177,11 +177,11 @@ def _find_best_match(
             continue
         if track.track_id in matched_track_ids:
             continue
-        if track.class_name != class_name:
-            continue
 
         iou = bbox_iou(track.bbox, bbox)
         distance = center_distance(track.center, center)
+        is_class_match = (track.class_name == class_name)
+
         if iou >= track_iou_threshold():
             score = 1.0 + iou
         elif distance <= track_distance_threshold():
@@ -189,11 +189,19 @@ def _find_best_match(
         else:
             continue
 
+        if is_class_match:
+            score += 0.5
+        else:
+            # Allow class mismatch only if there is high spatial overlap or extremely close proximity
+            if iou < 0.4 and distance > 40:
+                continue
+
         if score > best_score:
             best_score = score
             best_track = track
 
     return best_track
+
 
 
 def _mark_lost_tracks(tracks: list[TrackedObject], now: datetime) -> None:

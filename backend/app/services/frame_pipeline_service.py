@@ -48,7 +48,7 @@ def get_bbox_smoothing_alpha() -> float:
 
 
 def get_track_ttl_seconds() -> float:
-    return _float_env("TRACK_TTL_SECONDS", 10.0)
+    return _float_env("TRACK_TTL_SECONDS", 1.5)
 
 
 def get_track_max_misses() -> int:
@@ -61,7 +61,8 @@ def get_track_min_hits() -> int:
 
 
 def get_show_lost_tracks() -> bool:
-    return os.getenv("SHOW_LOST_TRACKS", "false").strip().lower() in {"1", "true", "yes", "on"}
+    raw = os.getenv("TRACK_SHOW_LOST", os.getenv("SHOW_LOST_TRACKS", "false")).strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def process_frame(

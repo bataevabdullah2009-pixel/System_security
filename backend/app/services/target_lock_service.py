@@ -1,17 +1,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Format per channel:
-# {
-#     "locked": bool,
-#     "track_id": int | None,
-#     "class_name": str | None,
-#     "status": str | None
-# }
+# Key: channel, Value: dict
 _TARGET_LOCKS: dict[str, dict[str, Any]] = {}
 
 
@@ -20,7 +15,12 @@ def get_default_lock_state() -> dict[str, Any]:
         "locked": False,
         "track_id": None,
         "class_name": None,
-        "status": None,
+        "status": "none",
+        "locked_track_id": None,
+        "locked_class_name": None,
+        "locked_since": None,
+        "last_seen_at": None,
+        "lock_status": "none",
     }
 
 
@@ -35,11 +35,18 @@ def lock_target_by_id(
 ) -> dict[str, Any]:
     """Locks a target on a channel by its track ID."""
     channel_key = str(channel)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    
     lock_state = {
         "locked": True,
         "track_id": int(track_id),
         "class_name": class_name,
         "status": status,
+        "locked_track_id": int(track_id),
+        "locked_class_name": class_name,
+        "locked_since": now_iso,
+        "last_seen_at": now_iso,
+        "lock_status": status,
     }
     _TARGET_LOCKS[channel_key] = lock_state
     logger.info("Locked target by ID #%d on channel %s", track_id, channel_key)
@@ -59,7 +66,6 @@ def lock_target_by_coordinates(
     min_dist = float("inf")
 
     for obj in active_objects:
-        # Check center [cx, cy]
         if hasattr(obj, "center") and obj.center:
             cx, cy = obj.center
         elif isinstance(obj, dict) and "center" in obj:
@@ -80,7 +86,6 @@ def lock_target_by_coordinates(
             min_dist = dist
             closest_obj = obj
 
-    # We can set a maximum radius to lock, e.g., 200 pixels, or just closest
     if closest_obj is not None:
         track_id = (
             closest_obj.track_id
@@ -115,11 +120,15 @@ def sync_target_with_tracks(channel: str, active_objects: list[Any]) -> None:
     """Updates status/metadata of the locked target based on active tracks."""
     channel_key = str(channel)
     status = get_target_status(channel_key)
-    if not status["locked"]:
+    
+    # If not locked at all
+    if not status["locked"] and status["lock_status"] == "none":
         return
 
-    track_id = status["track_id"]
-    # Find this track in the active objects list
+    track_id = status["locked_track_id"] or status["track_id"]
+    if track_id is None:
+        return
+
     matching_obj = None
     for obj in active_objects:
         obj_id = obj.track_id if hasattr(obj, "track_id") else obj.get("track_id")
@@ -127,8 +136,8 @@ def sync_target_with_tracks(channel: str, active_objects: list[Any]) -> None:
             matching_obj = obj
             break
 
+    now_iso = datetime.now(timezone.utc).isoformat()
     if matching_obj is not None:
-        # Track is active, update status and class name
         obj_status = (
             matching_obj.status
             if hasattr(matching_obj, "status")
@@ -140,10 +149,13 @@ def sync_target_with_tracks(channel: str, active_objects: list[Any]) -> None:
             else matching_obj.get("class_name")
         )
         status["status"] = obj_status
+        status["lock_status"] = obj_status
         status["class_name"] = obj_class
+        status["locked_class_name"] = obj_class
+        status["last_seen_at"] = now_iso
     else:
-        # Track is not in the active objects list, it is lost/expired
         status["status"] = "lost"
+        status["lock_status"] = "lost"
 
 
 def reset_target_lock_service() -> None:

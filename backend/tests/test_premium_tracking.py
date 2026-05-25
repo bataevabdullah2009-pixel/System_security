@@ -266,3 +266,31 @@ def test_expired_tracks_are_deleted_from_global_state(monkeypatch):
     tracks_in_cache = tracking_service._TRACKS_BY_CHANNEL.get("101", [])
     assert len(tracks_in_cache) == 0
 
+
+def test_no_duplicate_tracks_for_same_object():
+    """Verify that similar bounding boxes update the same track ID instead of duplicating."""
+    now = datetime.now(timezone.utc)
+    
+    det1 = DetectionResult(
+        class_name="person",
+        confidence=0.91,
+        bbox=BoundingBox(x1=10, y1=10, x2=50, y2=80),
+        channel="101",
+        timestamp=now.isoformat(),
+    )
+    tracks1 = tracking_service.update_tracks("101", [det1], now=now)
+    assert len(tracks1) == 1
+    track_id = tracks1[0].track_id
+
+    det2 = DetectionResult(
+        class_name="person",
+        confidence=0.95,
+        bbox=BoundingBox(x1=13, y1=12, x2=53, y2=82),
+        channel="101",
+        timestamp=(now + timedelta(seconds=1)).isoformat(),
+    )
+    tracks2 = tracking_service.update_tracks("101", [det2], now=now + timedelta(seconds=1))
+    assert len(tracks2) == 1
+    assert tracks2[0].track_id == track_id
+
+
